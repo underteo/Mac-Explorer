@@ -1,0 +1,169 @@
+/* Sidebar */
+"sidebar.home" = "Home";
+"sidebar.desktop" = "Desktop";
+"sidebar.documents" = "Documents";
+"sidebar.downloads" = "Downloads";
+"sidebar.favorites" = "Favorites";
+"sidebar.applications" = "Applications";
+"sidebar.movies" = "Movies";
+"sidebar.music" = "Music";
+"sidebar.pictures" = "Pictures";
+"sidebar.trash" = "Trash";
+"sidebar.section.locations" = "Locations";
+"sidebar.section.favorites" = "Favorites";
+"sidebar.favorites.empty" = "No favorites yet";
+
+/* Toolbar */
+"toolbar.open_folder" = "Open Folder";
+"toolbar.refresh" = "Refresh";
+"toolbar.view" = "View";
+"toolbar.sort" = "Sort";
+"toolbar.dual_pane" = "Dual Pane";
+"toolbar.copy_to_other" = "Copy to Other Pane";
+"toolbar.move_to_other" = "Move to Other Pane";
+"path.edit" = "Edit Path";
+"path.placeholder" = "Enter a folder path";
+"path.invalid" = "That path is not an accessible folder.";
+
+/* Search & commands */
+"search.prompt" = "Search in this folder  ";
+"command.new_window" = "New Window";
+"command.new_tab" = "New Tab";
+"command.new_pane" = "New Pane";
+"command.close_tab" = "Close Tab";
+"command.back" = "Back";
+"command.forward" = "Forward";
+"menu.go" = "Go";
+
+/* Columns & sort */
+"column.name" = "Name";
+"column.date" = "Date Modified";
+"column.size" = "Size";
+"column.kind" = "Kind";
+"sort.name" = "Name";
+"sort.date" = "Date";
+"sort.size" = "Size";
+"sort.kind" = "Kind";
+"sort.ascending" = "Ascending";
+"sort.descending" = "Descending";
+
+/* States */
+"state.empty.title" = "Empty Folder";
+"state.empty.message" = "This folder has no items to show.";
+"state.error.title" = "Unable to Open";
+
+/* Actions */
+"action.open" = "Open";
+"action.open_with" = "Open With";
+"open_with.other" = "Other…";
+"open_with.choose" = "Choose";
+"action.new_folder" = "New Folder";
+"action.new_file" = "New File";
+"template.file" = "File";
+"action.rename" = "Rename";
+"action.reveal_finder" = "Reveal in Finder";
+"action.move_to_trash" = "Move to Trash";
+"default.new_folder" = "New Folder";
+"favorites.add" = "Add to Favorites";
+"favorites.remove" = "Remove from Favorites";
+"pane.secondary" = "Secondary";
+
+/* Alerts */
+"alert.trash.title" = "Move to Trash?";
+"alert.trash.message" = "Selected items will be moved to the Trash.";
+"alert.trash.confirm" = "Move to Trash";
+"alert.cancel" = "Cancel";
+"alert.ok" = "OK";
+"alert.error.title" = "Error";
+"alert.collision.title" = "Name Collision";
+"alert.collision.message %@" = "“%@” already exists. Overwrite?";
+"alert.collision.overwrite" = "Overwrite";
+"alert.fda.title" = "Full Disk Access Recommended";
+"alert.fda.message" = "macOS protects Desktop, Documents, and Downloads. Mac Explorer can’t enable Full Disk Access by itself — open System Settings, add Mac Explorer from /Applications (not the Xcode build), then quit and reopen that copy.";
+"alert.fda.open_settings" = "Open System Settings…";
+"alert.fda.later" = "Not Now";
+"alert.fda.derived.title" = "Running Xcode Build";
+"alert.fda.derived.message %@" = "This session is the Xcode DerivedData copy:\n%@\n\nFull Disk Access is tied to each app path. Grant it to /Applications/Mac Explorer.app and open that copy — otherwise macOS keeps asking for Desktop access.";
+"alert.fda.derived.open_apps" = "Open /Applications Copy";
+
+/* Errors */
+"error.missing_path %@" = "“%@” could not be found.";
+"error.permission_denied %@" = "Permission denied for “%@”.";
+"error.not_directory %@" = "“%@” is not a folder.";
+"error.name_collision %@" = "An item named “%@” already exists.";
+"error.cancelled" = "Operation cancelled.";
+"error.plugin_path_traversal" = "Plugin executable path is outside the plugin folder.";
+"error.plugin_no_handler" = "Plugin has no executable or URL handler.";
+
+/* Settings */
+"settings.general" = "General";
+"settings.sidebar" = "Sidebar";
+"settings.sidebar.header" = "Show these items in the sidebar:";
+"settings.plugins" = "Plugins";
+"settings.new_window_shows" = "New windows show:";
+"settings.open_folders_in_tabs" = "Open folders in tabs instead of new windows";
+"settings.language" = "Language";
+"settings.language.system" = "System";
+"settings.language.footer" = "System uses the language from System Settings. Changing language updates Mac Explorer immediately.";
+"settings.zoom" = "Interface zoom";
+"settings.zoom.reset" = "Reset to 100%";
+"settings.zoom.footer" = "Scales the explorer interface from 50% to 150%. Default is 100%.";
+"settings.privacy.header" = "Folder Access";
+"settings.privacy.open_fda" = "Open Full Disk Access…";
+"settings.privacy.open_files_folders" = "Open Files & Folders…";
+"settings.privacy.footer" = "Grant Full Disk Access to /Applications/Mac Explorer.app, then always open that copy. Xcode/DerivedData builds are a different path — macOS will keep asking for Desktop even if FDA is already on for Applications.";
+"settings.plugins.header" = "Installed Plugins";
+"settings.plugins.reload" = "Reload";
+"settings.plugins.reveal" = "Show Folder";
+"settings.plugins.empty" = "No plugins found. Use Plugins → Install Plugin… or drop a folder with manifest.json into the Plugins directory (changes reload automatically).";
+"menu.plugins" = "Plugins";
+"plugins.install" = "Install Plugin…";
+"plugins.install.panel_message" = "Choose a plugin folder that contains manifest.json";
+"plugins.install.panel_prompt" = "Install";
+"error.plugin_missing_manifest" = "That folder has no valid manifest.json.";
+"error.plugin_install_reload" = "Plugin copied but failed to load. Check Settings → Plugins.";
+"settings.plugins.enabled" = "Enabled";
+"settings.plugins.version %@" = "Version %@";
+
+/* Remaining features */
+"action.copy" = "Copy";
+"action.cut" = "Cut";
+"action.paste" = "Paste";
+"action.duplicate" = "Duplicate";
+"action.copy_path" = "Copy Path";
+"action.get_info" = "Get Info";
+"command.enclosing_folder" = "Enclosing Folder";
+"command.toggle_hidden" = "Show Hidden Files";
+"menu.view" = "View";
+"sidebar.section.recents" = "Recents";
+"sidebar.recents.empty" = "No recent folders";
+"sidebar.recents.clear" = "Clear Recents";
+"info.title" = "Info";
+"info.name" = "Name";
+"info.kind" = "Kind";
+"info.size" = "Size";
+"info.created" = "Created";
+"info.modified" = "Modified";
+"info.permissions" = "Permissions";
+"info.symlink" = "This item is a symbolic link.";
+"menu.file_ops" = "File";
+
+/* Sample plugin */
+"plugin.sample.name" = "Sample Tools";
+"plugin.sample.shortcuts" = "Shortcuts";
+"plugin.sample.echo" = "Echo Selection";
+"plugin.sample.count" = "Count Selection";
+"plugin.cursor.name" = "Cursor";
+"plugin.cursor.chat" = "Open Chat in Folder";
+"plugin.cursor.agent" = "Agent in Terminal…";
+"plugin.cursor.open_submenu" = "Open";
+"plugin.cursor.open" = "Open in Cursor";
+"plugin.cursor.open_classic" = "Open in Editor (Classic)";
+"plugin.cursor.open_reuse" = "Open in Current Window";
+"plugin.cursor.add" = "Add Folder to Current Window";
+"plugin.cursor.diff" = "Compare Two Files…";
+"plugin.cursor.copy_cli" = "Copy cursor CLI Command";
+"Sample Tools" = "Sample Tools";
+"Shortcuts" = "Shortcuts";
+"Echo Selection" = "Echo Selection";
+"Count Selection" = "Count Selection";

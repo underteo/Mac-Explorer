@@ -1,0 +1,951 @@
+import SwiftUI
+import AppKit
+import Combine
+
+struct ExplorerRootView: View {
+    @EnvironmentObject private var app: AppModel
+    @EnvironmentObject private var settings: AppSettings
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var showTrashConfirm = false
+    @State private var renameTarget: FileItem?
+    @State private var renameText = ""
+    @State private var collisionAlert: String?
+    @State private var pendingCollision: PendingCollision?
+
+    var body: some View {
+        rootChrome
+            .modifier(ExplorerCommandReceiver { name, object in
+                handleCommand(name, object: object)
+            })
+            .modifier(ExplorerDialogs(
+                showTrashConfirm: $showTrashConfirm,
+                collisionAlert: $collisionAlert,
+                pendingCollision: $pendingCollision,
+                lastErrorMessage: $app.lastErrorMessage,
+                onTrash: { Task { await performTrash() } },
+                onOverwrite: { Task { await resolveCollision(overwrite: true) } }
+            ))
+            .sheet(item: infoSheetBinding) { item in
+                GetInfoSheet(info: item.summary) {
+                    app.infoSummary = nil
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let progress = app.transferProgress {
+                    TransferProgressBanner(progress: progress) {
+                        app.transferProgress?.isCancelled = true
+                    }
+                    .padding()
+                }
+            }
+    }
+
+    private var rootChrome: some View {
+        VStack(spacing: 0) {
+            tabBar
+            pathBar
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                SidebarView()
+            } detail: {
+                detailContent
+            }
+        }
+        .navigationTitle(app.selectedTab.pane.currentURL.lastPathComponent)
+        .toolbar { toolbarContent }
+        .searchable(text: bindingSearchQuery, prompt: Text(L10n.tr("search.prompt")))
+        .onSubmit(of: .search) {
+            Task { await runSearch() }
+        }
+        .onChange(of: app.selectedTab.searchQuery) { _, newValue in
+            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                var tab = app.selectedTab
+                tab.searchResults = []
+                tab.isSearching = false
+                app.selectedTab = tab
+            } else {
+                Task { await runSearch() }
+            }
+        }
+        .onChange(of: app.activePaneID) { _, _ in
+            if app.selectedTab.hasActiveSearch {
+                Task { await runSearch() }
+            }
+        }
+        .task {
+            await refreshPrimary()
+            if app.dualPaneEnabled {
+                await refreshSecondary()
+            }
+        }
+    }
+
+    private var infoSheetBinding: Binding<InfoSheetItem?> {
+        Binding(
+            get: { app.infoSummary.map { InfoSheetItem(summary: $0) } },
+            set: { app.infoSummary = $0?.summary }
+        )
+    }
+
+    func handleCommand(_ name: Notification.Name, object: Any?) {
+        switch name {
+        case .explorerNewTab:
+            app.newTab()
+            Task { await refreshPrimary() }
+        case .explorerGoBack:
+            guard !app.isEditingText else { return }
+            Task { await goBackPrimary() }
+        case .explorerGoForward:
+            guard !app.isEditingText else { return }
+            Task { await goForwardPrimary() }
+        case .explorerGoUp:
+            guard !app.isEditingText else { return }
+            Task { await goUpPrimary() }
+        case .explorerRefresh:
+            Task {
+                await refreshPrimary()
+                if app.dualPaneEnabled { await refreshSecondary() }
+            }
+        case .explorerOpenFolder:
+            openFolderPanel()
+        case .explorerPathInvalid:
+            if let message = object as? String {
+                app.lastErrorMessage = message
+            }
+        case .explorerNewFolder:
+            guard !app.isEditingText else { return }
+            createNewFolder()
+        case .explorerNewFile:
+            guard !app.isEditingText else { return }
+            if let raw = object as? String, let template = FileTemplate(rawValue: raw) {
+                createNewFile(template)
+            }
+        case .explorerCopy:
+            if copyFocusedTextOrSelection(cut: false) { return }
+            copySelection(cut: false)
+        case .explorerCut:
+            if copyFocusedTextOrSelection(cut: true) { return }
+            copySelection(cut: true)
+        case .explorerPaste:
+            if pasteIntoFocusedTextField() { return }
+            let destination = object as? URL
+            Task { await pasteClipboard(to: destination) }
+        case .explorerDuplicate:
+            guard !app.isEditingText else { return }
+            Task { await duplicateSelection() }
+        case .explorerCopyPath:
+            copySelectionPaths()
+        case .explorerGetInfo:
+            showGetInfo()
+        case .explorerTrash:
+            guard !app.isEditingText else { return }
+            if !app.activePane.selectedURLs.isEmpty {
+                showTrashConfirm = true
+            }
+        case .explorerToggleHidden:
+            app.showHiddenFiles.toggle()
+            Task {
+                await refreshPrimary()
+                if app.dualPaneEnabled { await refreshSecondary() }
+            }
+        case .explorerToggleDualPane:
+            app.dualPaneEnabled.toggle()
+            if app.dualPaneEnabled {
+                Task { await refreshSecondary() }
+            }
+        case .explorerInstallPlugin:
+            app.pluginManager.presentInstallPanel()
+        case .explorerReloadPlugins:
+            app.pluginManager.reload()
+        case .explorerRevealPlugins:
+            app.pluginManager.revealPluginsFolder()
+        case .explorerPluginInstallFailed:
+            if let message = object as? String {
+                app.lastErrorMessage = message
+            }
+        default:
+            break
+        }
+    }
+
+    private var bindingSearchQuery: Binding<String> {
+        Binding(
+            get: { app.selectedTab.searchQuery },
+            set: { value in
+                var tab = app.selectedTab
+                tab.searchQuery = value
+                app.selectedTab = tab
+            }
+        )
+    }
+
+    private var tabBar: some View {
+        HStack(spacing: 4) {
+            ForEach(app.tabs) { tab in
+                TabChip(
+                    title: tab.pane.currentURL.lastPathComponent,
+                    isSelected: tab.id == app.selectedTabID,
+                    onSelect: {
+                        app.selectedTabID = tab.id
+                        Task { await refreshPrimary() }
+                    },
+                    onClose: {
+                        app.closeTab(tab.id)
+                    }
+                )
+            }
+            Button {
+                app.newTab()
+                Task { await refreshPrimary() }
+            } label: {
+                Image(systemName: "plus")
+            }
+            .help(L10n.tr("command.new_tab"))
+            .accessibilityLabel(L10n.tr("command.new_tab"))
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.bar)
+    }
+
+    private var pathBar: some View {
+        PathLocationBar(
+            url: app.activePane.currentURL,
+            onNavigate: { url in
+                Task { await navigateActivePane(to: url) }
+            },
+            onEditingChanged: { editing in
+                app.isEditingText = editing
+            }
+        )
+        .background(.bar)
+        .id(app.activePaneID)
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        if app.dualPaneEnabled {
+            HSplitView {
+                PaneBrowserView(
+                    pane: primaryPaneBinding,
+                    isPrimary: true,
+                    onOpen: { item in Task { await openItem(item, primary: true) } },
+                    onTrash: { showTrashConfirm = true },
+                    onRename: { beginRename($0) },
+                    onRefresh: { Task { await refreshPrimary() } },
+                    onCreated: { url in Task { await selectAndBeginRename(url, primary: true) } },
+                    onPaste: { Task { await pasteClipboard(to: app.primaryPane.currentURL) } },
+                    onActivate: { app.activatePane(.primary) },
+                    renameURL: renameTarget?.url,
+                    renameText: $renameText,
+                    onCommitRename: { Task { await performRename() } },
+                    onCancelRename: { cancelRename() }
+                )
+                PaneBrowserView(
+                    pane: secondaryPaneBinding,
+                    isPrimary: false,
+                    onOpen: { item in Task { await openItem(item, primary: false) } },
+                    onTrash: { showTrashConfirm = true },
+                    onRename: { beginRename($0) },
+                    onRefresh: { Task { await refreshSecondary() } },
+                    onCreated: { url in Task { await selectAndBeginRename(url, primary: false) } },
+                    onPaste: { Task { await pasteClipboard(to: app.secondaryPane.currentURL) } },
+                    onActivate: { app.activatePane(.secondary) },
+                    renameURL: renameTarget?.url,
+                    renameText: $renameText,
+                    onCommitRename: { Task { await performRename() } },
+                    onCancelRename: { cancelRename() }
+                )
+            }
+        } else {
+            PaneBrowserView(
+                pane: primaryPaneBinding,
+                isPrimary: true,
+                onOpen: { item in Task { await openItem(item, primary: true) } },
+                onTrash: { showTrashConfirm = true },
+                onRename: { beginRename($0) },
+                onRefresh: { Task { await refreshPrimary() } },
+                onCreated: { url in Task { await selectAndBeginRename(url, primary: true) } },
+                onPaste: { Task { await pasteClipboard(to: app.primaryPane.currentURL) } },
+                onActivate: { app.activatePane(.primary) },
+                renameURL: renameTarget?.url,
+                renameText: $renameText,
+                onCommitRename: { Task { await performRename() } },
+                onCancelRename: { cancelRename() }
+            )
+        }
+    }
+
+    private var primaryPaneBinding: Binding<PaneState> {
+        Binding(
+            get: { app.primaryPane },
+            set: { newValue in
+                guard app.primaryPane != newValue else { return }
+                app.primaryPane = newValue
+            }
+        )
+    }
+
+    private var secondaryPaneBinding: Binding<PaneState> {
+        Binding(
+            get: { app.secondaryPane },
+            set: { newValue in
+                guard app.secondaryPane != newValue else { return }
+                app.secondaryPane = newValue
+            }
+        )
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            Button {
+                Task { await goBackPrimary() }
+            } label: {
+                Image(systemName: "chevron.backward")
+            }
+            .disabled(!app.primaryPane.history.canGoBack)
+            .help(L10n.tr("command.back"))
+            .accessibilityLabel(L10n.tr("command.back"))
+
+            Button {
+                Task { await goForwardPrimary() }
+            } label: {
+                Image(systemName: "chevron.forward")
+            }
+            .disabled(!app.primaryPane.history.canGoForward)
+            .help(L10n.tr("command.forward"))
+            .accessibilityLabel(L10n.tr("command.forward"))
+
+            Button {
+                Task { await goUpPrimary() }
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .disabled(app.primaryPane.currentURL.path == "/")
+            .help(L10n.tr("command.enclosing_folder"))
+            .accessibilityLabel(L10n.tr("command.enclosing_folder"))
+        }
+
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                openFolderPanel()
+            } label: {
+                Label(L10n.tr("toolbar.open_folder"), systemImage: "folder.badge.plus")
+            }
+            .help(L10n.tr("toolbar.open_folder"))
+            .accessibilityLabel(L10n.tr("toolbar.open_folder"))
+
+            Button {
+                createNewFolder()
+            } label: {
+                Label(L10n.tr("action.new_folder"), systemImage: "plus.rectangle.on.folder")
+            }
+            .help(L10n.tr("action.new_folder"))
+            .accessibilityLabel(L10n.tr("action.new_folder"))
+
+            Button {
+                Task { await refreshPrimary() }
+            } label: {
+                Label(L10n.tr("toolbar.refresh"), systemImage: "arrow.clockwise")
+            }
+            .help(L10n.tr("toolbar.refresh"))
+            .accessibilityLabel(L10n.tr("toolbar.refresh"))
+
+            Toggle(isOn: $app.showHiddenFiles) {
+                Image(systemName: "eye")
+            }
+            .toggleStyle(.button)
+            .help(L10n.tr("command.toggle_hidden"))
+            .accessibilityLabel(L10n.tr("command.toggle_hidden"))
+            .onChange(of: app.showHiddenFiles) { _, _ in
+                Task {
+                    await refreshPrimary()
+                    if app.dualPaneEnabled { await refreshSecondary() }
+                }
+            }
+
+            Picker(L10n.tr("toolbar.view"), selection: Binding(
+                get: { app.primaryPane.viewMode },
+                set: {
+                    var pane = app.primaryPane
+                    pane.viewMode = $0
+                    app.primaryPane = pane
+                }
+            )) {
+                Image(systemName: "list.bullet").tag(FileViewMode.list)
+                Image(systemName: "square.grid.2x2").tag(FileViewMode.grid)
+            }
+            .pickerStyle(.segmented)
+            .help(L10n.tr("toolbar.view"))
+            .accessibilityLabel(L10n.tr("toolbar.view"))
+
+            Toggle(isOn: $app.dualPaneEnabled) {
+                Image(systemName: "rectangle.split.2x1")
+            }
+            .toggleStyle(.button)
+            .help(L10n.tr("toolbar.dual_pane"))
+            .accessibilityLabel(L10n.tr("toolbar.dual_pane"))
+            .onChange(of: app.dualPaneEnabled) { _, enabled in
+                if enabled {
+                    Task { await refreshSecondary() }
+                }
+            }
+
+            if app.dualPaneEnabled {
+                Button {
+                    Task { await transferBetweenPanes(move: false) }
+                } label: {
+                    Label(L10n.tr("toolbar.copy_to_other"), systemImage: "doc.on.doc")
+                }
+                .disabled(app.activePane.selectedURLs.isEmpty)
+                .help(L10n.tr("toolbar.copy_to_other"))
+                .accessibilityLabel(L10n.tr("toolbar.copy_to_other"))
+
+                Button {
+                    Task { await transferBetweenPanes(move: true) }
+                } label: {
+                    Label(L10n.tr("toolbar.move_to_other"), systemImage: "arrow.right.doc.on.clipboard")
+                }
+                .disabled(app.activePane.selectedURLs.isEmpty)
+                .help(L10n.tr("toolbar.move_to_other"))
+                .accessibilityLabel(L10n.tr("toolbar.move_to_other"))
+            }
+        }
+    }
+
+    private func openFolderPanel() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                await openDirectory(url, primary: true)
+            }
+        }
+    }
+
+    /// Opens a directory in the current pane, or in a new tab when that preference is on.
+    private func openDirectory(_ url: URL, primary: Bool) async {
+        if primary, settings.openFoldersInTabs {
+            app.newTab(url: url)
+            await refreshPrimary()
+            app.recordRecent(url)
+            return
+        }
+        if primary {
+            await navigatePrimary(to: url)
+        } else {
+            var pane = app.secondaryPane
+            await PaneController.navigate(&pane, to: url, using: app.filesystem)
+            app.secondaryPane = pane
+        }
+    }
+
+    private func refreshPrimary() async {
+        var pane = app.primaryPane
+        await PaneController.reload(&pane, using: app.filesystem)
+        app.primaryPane = pane
+        var tab = app.selectedTab
+        tab.title = pane.currentURL.lastPathComponent
+        app.selectedTab = tab
+    }
+
+    private func refreshSecondary() async {
+        var pane = app.secondaryPane
+        await PaneController.reload(&pane, using: app.filesystem)
+        app.secondaryPane = pane
+    }
+
+    private func navigatePrimary(to url: URL) async {
+        var pane = app.primaryPane
+        await PaneController.navigate(&pane, to: url, using: app.filesystem)
+        app.primaryPane = pane
+        var tab = app.selectedTab
+        tab.title = url.lastPathComponent
+        tab.searchQuery = ""
+        tab.searchResults = []
+        app.selectedTab = tab
+        app.recordRecent(url)
+    }
+
+    private func goBackPrimary() async {
+        var pane = app.primaryPane
+        await PaneController.goBack(&pane, using: app.filesystem)
+        app.primaryPane = pane
+        app.recordRecent(pane.currentURL)
+    }
+
+    private func goForwardPrimary() async {
+        var pane = app.primaryPane
+        await PaneController.goForward(&pane, using: app.filesystem)
+        app.primaryPane = pane
+        app.recordRecent(pane.currentURL)
+    }
+
+    private func goUpPrimary() async {
+        let current = app.primaryPane.currentURL
+        let parent = current.deletingLastPathComponent()
+        guard parent.path != current.path else { return }
+        await navigatePrimary(to: parent)
+    }
+
+    private func createNewFolder() {
+        do {
+            let url = try app.fileOperations.createFolder(
+                named: L10n.tr("default.new_folder"),
+                in: app.primaryPane.currentURL
+            )
+            Task { await selectAndBeginRename(url, primary: true) }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func createNewFile(_ template: FileTemplate) {
+        do {
+            let url = try app.fileOperations.createFile(template: template, in: app.primaryPane.currentURL)
+            Task { await selectAndBeginRename(url, primary: true) }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Refresh the pane, select the new item, and start inline rename.
+    private func selectAndBeginRename(_ url: URL, primary: Bool) async {
+        let target = url.standardizedFileURL
+        if primary {
+            await refreshPrimary()
+        } else {
+            await refreshSecondary()
+        }
+        // Let the list/grid commit the new row before focusing the editor.
+        try? await Task.sleep(for: .milliseconds(80))
+
+        if primary {
+            var pane = app.primaryPane
+            if let item = pane.items.first(where: { $0.url.standardizedFileURL == target })
+                ?? (try? app.filesystem.makeItem(from: target)) {
+                pane.selectedURLs = [item.url]
+                app.primaryPane = pane
+                beginRename(item)
+            }
+        } else {
+            var pane = app.secondaryPane
+            if let item = pane.items.first(where: { $0.url.standardizedFileURL == target })
+                ?? (try? app.filesystem.makeItem(from: target)) {
+                pane.selectedURLs = [item.url]
+                app.secondaryPane = pane
+                beginRename(item)
+            }
+        }
+    }
+
+    private func selectedURLs() -> [URL] {
+        Array(app.activePane.selectedURLs)
+    }
+
+    /// When the path bar / rename field is focused, ⌘C/⌘X must edit text — not the file clipboard.
+    /// With no text selection, copy the whole field (address-bar style).
+    @discardableResult
+    private func copyFocusedTextOrSelection(cut: Bool) -> Bool {
+        guard app.isEditingText || focusedTextView() != nil else { return false }
+        if let textView = focusedTextView() {
+            let range = textView.selectedRange()
+            if range.length > 0 {
+                if cut {
+                    textView.cut(nil)
+                } else {
+                    textView.copy(nil)
+                }
+                return true
+            }
+            let full = textView.string
+            guard !full.isEmpty else { return true }
+            if cut {
+                textView.selectAll(nil)
+                textView.cut(nil)
+            } else {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(full, forType: .string)
+            }
+            return true
+        }
+        let selector: Selector = cut ? #selector(NSText.cut(_:)) : #selector(NSText.copy(_:))
+        return NSApp.sendAction(selector, to: nil, from: nil)
+    }
+
+    @discardableResult
+    private func pasteIntoFocusedTextField() -> Bool {
+        guard app.isEditingText || focusedTextView() != nil else { return false }
+        if let textView = focusedTextView() {
+            textView.paste(nil)
+            return true
+        }
+        return NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
+    }
+
+    private func focusedTextView() -> NSTextView? {
+        NSApp.keyWindow?.firstResponder as? NSTextView
+    }
+
+    private func copySelection(cut: Bool) {
+        let urls = selectedURLs()
+        guard !urls.isEmpty else { return }
+        app.copyToClipboard(urls, cut: cut)
+    }
+
+    private func navigateActivePane(to url: URL) async {
+        if app.dualPaneEnabled, app.activePaneID == .secondary {
+            var pane = app.secondaryPane
+            await PaneController.navigate(&pane, to: url, using: app.filesystem)
+            app.secondaryPane = pane
+        } else {
+            await navigatePrimary(to: url)
+        }
+    }
+
+    private func copySelectionPaths() {
+        let urls = selectedURLs()
+        guard !urls.isEmpty else {
+            app.fileOperations.copyPathToPasteboard([app.activePane.currentURL])
+            return
+        }
+        app.fileOperations.copyPathToPasteboard(urls)
+    }
+
+    private func pasteClipboard(to destination: URL? = nil) async {
+        guard let clip = app.fileClipboard, !clip.urls.isEmpty else { return }
+        let destination = destination ?? app.activePane.currentURL
+        do {
+            if clip.isCut {
+                try app.fileOperations.move(items: clip.urls, to: destination, overwrite: false)
+                app.clearClipboard()
+            } else {
+                try app.fileOperations.copy(items: clip.urls, to: destination, overwrite: false)
+            }
+            await refreshPrimary()
+            if app.dualPaneEnabled { await refreshSecondary() }
+        } catch let error as FilesystemError {
+            if case .nameCollision(let name) = error {
+                pendingCollision = PendingCollision(items: clip.urls, destination: destination, move: clip.isCut)
+                collisionAlert = L10n.tr("alert.collision.message %@", name)
+            } else {
+                app.lastErrorMessage = error.localizedDescription
+            }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func duplicateSelection() async {
+        for url in selectedURLs() {
+            do {
+                _ = try app.fileOperations.duplicate(url)
+            } catch {
+                app.lastErrorMessage = error.localizedDescription
+                break
+            }
+        }
+        await refreshPrimary()
+        if app.dualPaneEnabled { await refreshSecondary() }
+    }
+
+    private func showGetInfo() {
+        let url = selectedURLs().first ?? app.activePane.currentURL
+        do {
+            app.infoSummary = try app.fileOperations.makeInfo(for: url)
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func openItem(_ item: FileItem, primary: Bool) async {
+        if item.isDirectory {
+            await openDirectory(item.url, primary: primary)
+        } else {
+            app.fileOperations.open(item.url)
+        }
+    }
+
+    private func beginRename(_ item: FileItem) {
+        renameTarget = item
+        renameText = item.name
+        app.isEditingText = true
+    }
+
+    private func cancelRename() {
+        renameTarget = nil
+        renameText = ""
+        app.isEditingText = false
+    }
+
+    private func performRename() async {
+        guard let target = renameTarget else { return }
+        let newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if newName.isEmpty || newName == target.name {
+            cancelRename()
+            return
+        }
+        do {
+            _ = try app.fileOperations.rename(item: target.url, to: newName)
+            cancelRename()
+            await refreshPrimary()
+            if app.dualPaneEnabled { await refreshSecondary() }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+            // Remount the inline editor so the user can fix the name.
+            let item = target
+            let draft = newName
+            cancelRename()
+            renameText = draft
+            renameTarget = item
+            app.isEditingText = true
+        }
+    }
+
+    private func performTrash() async {
+        let urls = Array(app.activePane.selectedURLs)
+        guard !urls.isEmpty else { return }
+        do {
+            try app.fileOperations.moveToTrash(urls)
+            await refreshPrimary()
+            if app.dualPaneEnabled { await refreshSecondary() }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func runSearch() async {
+        let query = app.selectedTab.searchQuery
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            var tab = app.selectedTab
+            tab.searchResults = []
+            tab.isSearching = false
+            app.selectedTab = tab
+            return
+        }
+
+        let paneID = app.dualPaneEnabled ? app.activePaneID : .primary
+        let directory = app.activePane.currentURL
+
+        var tab = app.selectedTab
+        tab.isSearching = true
+        tab.searchPaneID = paneID
+        app.selectedTab = tab
+
+        do {
+            let results = try app.searchService.search(query: query, in: directory)
+            tab = app.selectedTab
+            // Drop stale results if the query changed while we were searching.
+            guard tab.searchQuery == query else { return }
+            tab.searchResults = results
+            tab.searchPaneID = paneID
+            tab.isSearching = false
+            app.selectedTab = tab
+        } catch {
+            tab = app.selectedTab
+            guard tab.searchQuery == query else { return }
+            app.lastErrorMessage = error.localizedDescription
+            tab.searchResults = []
+            tab.searchPaneID = paneID
+            tab.isSearching = false
+            app.selectedTab = tab
+        }
+    }
+
+    private func transferBetweenPanes(move: Bool) async {
+        // Source = selection in the last-activated pane; destination = the other pane.
+        let sourceURLs = Array(app.activePane.selectedURLs)
+        guard !sourceURLs.isEmpty else { return }
+        let destination = app.inactivePane.currentURL
+        await runTransfer(items: sourceURLs, to: destination, move: move)
+    }
+
+    private func runTransfer(items: [URL], to destination: URL, move: Bool) async {
+        app.transferProgress = TransferProgress(completed: 0, total: items.count)
+        do {
+            if move {
+                try await app.fileOperations.moveWithProgress(
+                    items: items,
+                    to: destination,
+                    overwrite: false,
+                    progress: { app.transferProgress = $0 },
+                    isCancelled: { app.transferProgress?.isCancelled == true }
+                )
+            } else {
+                try await app.fileOperations.copyWithProgress(
+                    items: items,
+                    to: destination,
+                    overwrite: false,
+                    progress: { app.transferProgress = $0 },
+                    isCancelled: { app.transferProgress?.isCancelled == true }
+                )
+            }
+            app.transferProgress = nil
+            await refreshPrimary()
+            await refreshSecondary()
+        } catch let error as FilesystemError {
+            if case .nameCollision(let name) = error {
+                pendingCollision = PendingCollision(items: items, destination: destination, move: move)
+                collisionAlert = L10n.tr("alert.collision.message %@", name)
+            } else if case .cancelled = error {
+                app.transferProgress = nil
+            } else {
+                app.lastErrorMessage = error.localizedDescription
+                app.transferProgress = nil
+            }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+            app.transferProgress = nil
+        }
+    }
+
+    private func resolveCollision(overwrite: Bool) async {
+        guard let pending = pendingCollision else { return }
+        collisionAlert = nil
+        pendingCollision = nil
+        app.transferProgress = TransferProgress(completed: 0, total: pending.items.count)
+        do {
+            if pending.move {
+                try await app.fileOperations.moveWithProgress(
+                    items: pending.items,
+                    to: pending.destination,
+                    overwrite: overwrite,
+                    progress: { app.transferProgress = $0 },
+                    isCancelled: { app.transferProgress?.isCancelled == true }
+                )
+            } else {
+                try await app.fileOperations.copyWithProgress(
+                    items: pending.items,
+                    to: pending.destination,
+                    overwrite: overwrite,
+                    progress: { app.transferProgress = $0 },
+                    isCancelled: { app.transferProgress?.isCancelled == true }
+                )
+            }
+            app.transferProgress = nil
+            await refreshPrimary()
+            await refreshSecondary()
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+            app.transferProgress = nil
+        }
+    }
+}
+
+private struct PendingCollision {
+    let items: [URL]
+    let destination: URL
+    let move: Bool
+}
+
+private struct InfoSheetItem: Identifiable {
+    var id: String { summary.path }
+    let summary: FileInfoSummary
+}
+
+private struct TabChip: View {
+    let title: String
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Button(title, action: onSelect)
+                .buttonStyle(.plain)
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.caption2)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("command.close_tab"))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+private struct TransferProgressBanner: View {
+    let progress: TransferProgress
+    let onCancel: () -> Void
+
+    var body: some View {
+        HStack {
+            ProgressView(value: progress.fraction)
+            Text("\(progress.completed)/\(progress.total)")
+            Button(L10n.tr("alert.cancel"), action: onCancel)
+        }
+        .padding(10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct ExplorerCommandReceiver: ViewModifier {
+    let onCommand: (Notification.Name, Any?) -> Void
+
+    private static let commandsPublisher: AnyPublisher<Notification, Never> = {
+        let names: [Notification.Name] = [
+            .explorerNewTab, .explorerGoBack, .explorerGoForward, .explorerGoUp,
+            .explorerRefresh, .explorerOpenFolder, .explorerPathInvalid,
+            .explorerNewFolder, .explorerNewFile, .explorerCopy, .explorerCut,
+            .explorerPaste, .explorerDuplicate, .explorerCopyPath, .explorerGetInfo,
+            .explorerTrash, .explorerToggleHidden, .explorerToggleDualPane,
+            .explorerInstallPlugin, .explorerReloadPlugins, .explorerRevealPlugins,
+            .explorerPluginInstallFailed
+        ]
+        return Publishers.MergeMany(names.map { NotificationCenter.default.publisher(for: $0) })
+            .eraseToAnyPublisher()
+    }()
+
+    func body(content: Content) -> some View {
+        content.onReceive(Self.commandsPublisher) { note in
+            onCommand(note.name, note.object)
+        }
+    }
+}
+
+private struct ExplorerDialogs: ViewModifier {
+    @Binding var showTrashConfirm: Bool
+    @Binding var collisionAlert: String?
+    @Binding var pendingCollision: PendingCollision?
+    @Binding var lastErrorMessage: String?
+    let onTrash: () -> Void
+    let onOverwrite: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .alert(L10n.tr("alert.trash.title"), isPresented: $showTrashConfirm) {
+                Button(L10n.tr("alert.cancel"), role: .cancel) {}
+                Button(L10n.tr("alert.trash.confirm"), role: .destructive, action: onTrash)
+            } message: {
+                Text(L10n.tr("alert.trash.message"))
+            }
+            .alert(L10n.tr("alert.error.title"), isPresented: Binding(
+                get: { lastErrorMessage != nil },
+                set: { if !$0 { lastErrorMessage = nil } }
+            )) {
+                Button(L10n.tr("alert.ok"), role: .cancel) { lastErrorMessage = nil }
+            } message: {
+                Text(lastErrorMessage ?? "")
+            }
+            .alert(L10n.tr("alert.collision.title"), isPresented: Binding(
+                get: { collisionAlert != nil },
+                set: { if !$0 { collisionAlert = nil; pendingCollision = nil } }
+            )) {
+                Button(L10n.tr("alert.cancel"), role: .cancel) {
+                    collisionAlert = nil
+                    pendingCollision = nil
+                }
+                Button(L10n.tr("alert.collision.overwrite"), role: .destructive, action: onOverwrite)
+            } message: {
+                Text(collisionAlert ?? "")
+            }
+    }
+}

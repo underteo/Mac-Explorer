@@ -1,0 +1,17 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.swiftpm/
+.cursor/
+
+.env
+.env.*
+*.pem
+credentials.json

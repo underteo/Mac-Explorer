@@ -1,0 +1,29 @@
+{
+  "id": "com.thehordeforge.sample",
+  "name": "plugin.sample.name",
+  "version": "1.0.0",
+  "match": {
+    "allowMultiSelect": true
+  },
+  "menu": [
+    {
+      "type": "submenu",
+      "title": "plugin.sample.shortcuts",
+      "children": [
+        {
+          "type": "action",
+          "id": "echo",
+          "title": "plugin.sample.echo",
+          "action": "echo"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "count",
+      "title": "plugin.sample.count",
+      "action": "count"
+    }
+  ],
+  "executable": "run.sh"
+}

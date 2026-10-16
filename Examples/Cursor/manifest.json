@@ -1,0 +1,65 @@
+{
+  "id": "com.thehordeforge.cursor",
+  "name": "Cursor",
+  "version": "1.0.0",
+  "match": {
+    "allowMultiSelect": true
+  },
+  "menu": [
+    {
+      "type": "action",
+      "id": "chat",
+      "title": "Apri chat nella cartella",
+      "action": "chat"
+    },
+    {
+      "type": "action",
+      "id": "agent",
+      "title": "Agent nel Terminale…",
+      "action": "agent"
+    },
+    {
+      "type": "submenu",
+      "title": "Apri",
+      "children": [
+        {
+          "type": "action",
+          "id": "open",
+          "title": "Apri in Cursor",
+          "action": "open"
+        },
+        {
+          "type": "action",
+          "id": "open-classic",
+          "title": "Apri nell’editor (Classic)",
+          "action": "open-classic"
+        },
+        {
+          "type": "action",
+          "id": "open-reuse",
+          "title": "Apri nella finestra corrente",
+          "action": "open-reuse"
+        },
+        {
+          "type": "action",
+          "id": "add",
+          "title": "Aggiungi cartella alla finestra corrente",
+          "action": "add"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "diff",
+      "title": "Confronta due file…",
+      "action": "diff"
+    },
+    {
+      "type": "action",
+      "id": "copy-cli",
+      "title": "Copia comando CLI cursor",
+      "action": "copy-cli"
+    }
+  ],
+  "executable": "run.sh"
+}

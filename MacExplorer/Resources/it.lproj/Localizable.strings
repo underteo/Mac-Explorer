@@ -1,0 +1,169 @@
+/* Sidebar */
+"sidebar.home" = "Inizio";
+"sidebar.desktop" = "Scrivania";
+"sidebar.documents" = "Documenti";
+"sidebar.downloads" = "Download";
+"sidebar.favorites" = "Preferiti";
+"sidebar.applications" = "Applicazioni";
+"sidebar.movies" = "Filmati";
+"sidebar.music" = "Musica";
+"sidebar.pictures" = "Immagini";
+"sidebar.trash" = "Cestino";
+"sidebar.section.locations" = "Posizioni";
+"sidebar.section.favorites" = "Preferiti";
+"sidebar.favorites.empty" = "Nessun preferito";
+
+/* Toolbar */
+"toolbar.open_folder" = "Apri cartella";
+"toolbar.refresh" = "Aggiorna";
+"toolbar.view" = "Vista";
+"toolbar.sort" = "Ordina";
+"toolbar.dual_pane" = "Doppia colonna";
+"toolbar.copy_to_other" = "Copia nell’altro riquadro";
+"toolbar.move_to_other" = "Sposta nell’altro riquadro";
+"path.edit" = "Modifica percorso";
+"path.placeholder" = "Inserisci il percorso di una cartella";
+"path.invalid" = "Questo percorso non è una cartella accessibile.";
+
+/* Search & commands */
+"search.prompt" = "Cerca in questa cartella  ";
+"command.new_window" = "Nuova finestra";
+"command.new_tab" = "Nuova scheda";
+"command.new_pane" = "Nuovo pannello";
+"command.close_tab" = "Chiudi scheda";
+"command.back" = "Indietro";
+"command.forward" = "Avanti";
+"menu.go" = "Vai";
+
+/* Columns & sort */
+"column.name" = "Nome";
+"column.date" = "Data modifica";
+"column.size" = "Dimensione";
+"column.kind" = "Tipo";
+"sort.name" = "Nome";
+"sort.date" = "Data";
+"sort.size" = "Dimensione";
+"sort.kind" = "Tipo";
+"sort.ascending" = "Crescente";
+"sort.descending" = "Decrescente";
+
+/* States */
+"state.empty.title" = "Cartella vuota";
+"state.empty.message" = "Questa cartella non contiene elementi da mostrare.";
+"state.error.title" = "Impossibile aprire";
+
+/* Actions */
+"action.open" = "Apri";
+"action.open_with" = "Apri con";
+"open_with.other" = "Altra…";
+"open_with.choose" = "Scegli";
+"action.new_folder" = "Nuova cartella";
+"action.new_file" = "Nuovo file";
+"template.file" = "File";
+"action.rename" = "Rinomina";
+"action.reveal_finder" = "Mostra nel Finder";
+"action.move_to_trash" = "Sposta nel Cestino";
+"default.new_folder" = "Nuova cartella";
+"favorites.add" = "Aggiungi ai Preferiti";
+"favorites.remove" = "Rimuovi dai Preferiti";
+"pane.secondary" = "Secondario";
+
+/* Alerts */
+"alert.trash.title" = "Spostare nel Cestino?";
+"alert.trash.message" = "Gli elementi selezionati verranno spostati nel Cestino.";
+"alert.trash.confirm" = "Sposta nel Cestino";
+"alert.cancel" = "Annulla";
+"alert.ok" = "OK";
+"alert.error.title" = "Errore";
+"alert.collision.title" = "Nome già esistente";
+"alert.collision.message %@" = "“%@” esiste già. Sovrascrivere?";
+"alert.collision.overwrite" = "Sovrascrivi";
+"alert.fda.title" = "Accesso disco completo consigliato";
+"alert.fda.message" = "macOS protegge Scrivania, Documenti e Download. Mac Explorer non può attivare da solo Accesso disco completo: apri Impostazioni di Sistema, aggiungi Mac Explorer da /Applications (non la build di Xcode), poi chiudi e riapri quella copia.";
+"alert.fda.open_settings" = "Apri Impostazioni di Sistema…";
+"alert.fda.later" = "Non ora";
+"alert.fda.derived.title" = "Stai usando la build di Xcode";
+"alert.fda.derived.message %@" = "Questa sessione è la copia in DerivedData:\n%@\n\nAccesso disco completo è legato al percorso dell’app. Concedilo a /Applications/Mac Explorer.app e apri quella copia — altrimenti macOS continua a chiedere l’accesso alla Scrivania.";
+"alert.fda.derived.open_apps" = "Apri la copia in Applicazioni";
+
+/* Errors */
+"error.missing_path %@" = "“%@” non è stato trovato.";
+"error.permission_denied %@" = "Permesso negato per “%@”.";
+"error.not_directory %@" = "“%@” non è una cartella.";
+"error.name_collision %@" = "Esiste già un elemento chiamato “%@”.";
+"error.cancelled" = "Operazione annullata.";
+"error.plugin_path_traversal" = "Il percorso dell’eseguibile del plugin è fuori dalla cartella del plugin.";
+"error.plugin_no_handler" = "Il plugin non ha un eseguibile o un gestore URL.";
+
+/* Settings */
+"settings.general" = "Generali";
+"settings.sidebar" = "Barra laterale";
+"settings.sidebar.header" = "Mostra questi elementi nella barra laterale:";
+"settings.plugins" = "Plugin";
+"settings.new_window_shows" = "Le nuove finestre mostrano:";
+"settings.open_folders_in_tabs" = "Apri cartelle in schede anziché in nuove finestre";
+"settings.language" = "Lingua";
+"settings.language.system" = "Sistema";
+"settings.language.footer" = "Sistema usa la lingua delle Impostazioni di Sistema. Il cambio lingua aggiorna subito Mac Explorer.";
+"settings.zoom" = "Zoom interfaccia";
+"settings.zoom.reset" = "Ripristina 100%";
+"settings.zoom.footer" = "Scala l’interfaccia da 50% a 150%. Il valore predefinito è 100%.";
+"settings.privacy.header" = "Accesso alle cartelle";
+"settings.privacy.open_fda" = "Apri Accesso disco completo…";
+"settings.privacy.open_files_folders" = "Apri File e cartelle…";
+"settings.privacy.footer" = "Concedi Accesso disco completo a /Applications/Mac Explorer.app e apri sempre quella copia. Le build Xcode/DerivedData sono un altro percorso: macOS continuerà a chiedere la Scrivania anche se FDA è già attivo per Applicazioni.";
+"settings.plugins.header" = "Plugin installati";
+"settings.plugins.reload" = "Ricarica";
+"settings.plugins.reveal" = "Mostra cartella";
+"settings.plugins.empty" = "Nessun plugin trovato. Usa Plugin → Installa plugin… oppure copia una cartella con manifest.json nella directory Plugin (le modifiche si ricaricano da sole).";
+"menu.plugins" = "Plugin";
+"plugins.install" = "Installa plugin…";
+"plugins.install.panel_message" = "Scegli una cartella plugin che contenga manifest.json";
+"plugins.install.panel_prompt" = "Installa";
+"error.plugin_missing_manifest" = "La cartella non contiene un manifest.json valido.";
+"error.plugin_install_reload" = "Plugin copiato ma non caricato. Controlla Impostazioni → Plugin.";
+"settings.plugins.enabled" = "Abilitato";
+"settings.plugins.version %@" = "Versione %@";
+
+/* Remaining features */
+"action.copy" = "Copia";
+"action.cut" = "Taglia";
+"action.paste" = "Incolla";
+"action.duplicate" = "Duplica";
+"action.copy_path" = "Copia percorso";
+"action.get_info" = "Ottieni informazioni";
+"command.enclosing_folder" = "Cartella contenitore";
+"command.toggle_hidden" = "Mostra file nascosti";
+"menu.view" = "Vista";
+"sidebar.section.recents" = "Recenti";
+"sidebar.recents.empty" = "Nessuna cartella recente";
+"sidebar.recents.clear" = "Svuota recenti";
+"info.title" = "Informazioni";
+"info.name" = "Nome";
+"info.kind" = "Tipo";
+"info.size" = "Dimensione";
+"info.created" = "Creato";
+"info.modified" = "Modificato";
+"info.permissions" = "Permessi";
+"info.symlink" = "Questo elemento è un collegamento simbolico.";
+"menu.file_ops" = "File";
+
+/* Sample plugin */
+"plugin.sample.name" = "Strumenti di esempio";
+"plugin.sample.shortcuts" = "Scorciatoie";
+"plugin.sample.echo" = "Ripeti selezione";
+"plugin.sample.count" = "Conta selezione";
+"plugin.cursor.name" = "Cursor";
+"plugin.cursor.chat" = "Apri chat nella cartella";
+"plugin.cursor.agent" = "Agent nel Terminale…";
+"plugin.cursor.open_submenu" = "Apri";
+"plugin.cursor.open" = "Apri in Cursor";
+"plugin.cursor.open_classic" = "Apri nell’editor (Classic)";
+"plugin.cursor.open_reuse" = "Apri nella finestra corrente";
+"plugin.cursor.add" = "Aggiungi cartella alla finestra corrente";
+"plugin.cursor.diff" = "Confronta due file…";
+"plugin.cursor.copy_cli" = "Copia comando CLI cursor";
+"Sample Tools" = "Strumenti di esempio";
+"Shortcuts" = "Scorciatoie";
+"Echo Selection" = "Ripeti selezione";
+"Count Selection" = "Conta selezione";
