@@ -22,4 +22,4 @@ authorization from the copyright holders.
 
 Technical note: a public clone URL cannot cryptographically prevent someone from
 copying files. The binding restriction is the **license and copyright notice**;
-hosts (GitHub / Cursor Origin) additionally keep write access owner-only.
+GitHub keeps write access owner-only.
