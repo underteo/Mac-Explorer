@@ -22,7 +22,11 @@ struct PathLocationBar: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onAppear { draftPath = url.path }
+            .onAppear {
+                draftPath = url.path
+                // Don't steal keyboard focus at window open / pane switch.
+                clearFocus()
+            }
             .onChange(of: url) { _, newURL in
                 if !fieldFocused {
                     draftPath = newURL.path
@@ -34,6 +38,15 @@ struct PathLocationBar: View {
                     draftPath = url.path
                 }
             }
+    }
+
+    private func clearFocus() {
+        fieldFocused = false
+        // SwiftUI may assign first-responder after appear; clear again next turn.
+        DispatchQueue.main.async {
+            fieldFocused = false
+            onEditingChanged?(false)
+        }
     }
 
     private func cancelEditing() {
