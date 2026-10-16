@@ -6,30 +6,6 @@ struct SidebarView: View {
 
     var body: some View {
         List {
-            if settings.isSidebarItemVisible(.recents) {
-                Section(L10n.tr("sidebar.section.recents")) {
-                    if app.recentItems.isEmpty {
-                        Text(L10n.tr("sidebar.recents.empty"))
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    } else {
-                        ForEach(app.recentItems) { recent in
-                            Button {
-                                navigate(to: recent.url)
-                            } label: {
-                                Label(recent.name, systemImage: "clock")
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        Button(L10n.tr("sidebar.recents.clear")) {
-                            app.recentsStore.clear()
-                            app.recentItems = []
-                        }
-                        .font(.caption)
-                    }
-                }
-            }
-
             if settings.isSidebarItemVisible(.favorites) {
                 Section(L10n.tr("sidebar.section.favorites")) {
                     if app.favoriteItems.isEmpty {
@@ -68,6 +44,30 @@ struct SidebarView: View {
                             Label(destination.localizedTitle, systemImage: destination.systemImage)
                         }
                         .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if settings.isSidebarItemVisible(.recents) {
+                Section(L10n.tr("sidebar.section.recents")) {
+                    if app.recentItems.isEmpty {
+                        Text(L10n.tr("sidebar.recents.empty"))
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    } else {
+                        ForEach(app.recentItems) { recent in
+                            Button {
+                                navigate(to: recent.url)
+                            } label: {
+                                Label(recent.name, systemImage: "clock")
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Button(L10n.tr("sidebar.recents.clear")) {
+                            app.recentsStore.clear()
+                            app.recentItems = []
+                        }
+                        .font(.caption)
                     }
                 }
             }
