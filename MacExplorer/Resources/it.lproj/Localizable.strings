@@ -1,5 +1,6 @@
 /* Sidebar */
 "sidebar.home" = "Inizio";
+"sidebar.macintoshHD" = "Macintosh HD";
 "sidebar.desktop" = "Scrivania";
 "sidebar.documents" = "Documenti";
 "sidebar.downloads" = "Download";
@@ -21,6 +22,9 @@
 "toolbar.dual_pane" = "Doppia colonna";
 "toolbar.copy_to_other" = "Copia nell’altro riquadro";
 "toolbar.move_to_other" = "Sposta nell’altro riquadro";
+"toolbar.share" = "Condividi";
+"toolbar.more" = "Altro";
+"toolbar.selection_actions" = "Azioni selezione";
 "path.edit" = "Modifica percorso";
 "path.placeholder" = "Inserisci il percorso di una cartella";
 "path.invalid" = "Questo percorso non è una cartella accessibile.";
@@ -105,10 +109,11 @@
 "settings.menu" = "Menu";
 "action.menu_settings" = "Impostazioni…";
 "settings.menu.header" = "Scegli dove compare ogni azione:";
-"settings.menu.footer" = "Contestuale = click destro. Azioni = menu Azioni di Mac Explorer (non Finder). Nascosto la toglie da entrambi.";
+"settings.menu.footer" = "Contestuale = click destro. Azioni = menu Azioni. Entrambi = contestuale e Azioni. Nascosto la toglie da entrambi.";
 "settings.menu.reset" = "Ripristina predefiniti";
 "settings.menu.placement.context" = "Contestuale";
 "settings.menu.placement.actions" = "Menu Azioni";
+"settings.menu.placement.both" = "Entrambi";
 "settings.menu.placement.hidden" = "Nascosto";
 "menu.actions" = "Azioni";
 "action.open_in_new_pane" = "Apri in un nuovo pannello";
@@ -117,7 +122,7 @@
 "action.make_alias" = "Crea alias";
 "action.quick_look" = "Visualizzazione rapida";
 "action.tags" = "Tag";
-"action.tags_hint" = "Tag: usa il menu contestuale (o sposta Tag su Contestuale nelle Impostazioni)";
+"action.tags_hint" = "Tag: usa il menu contestuale (o imposta Tag su Contestuale/Entrambi nelle Impostazioni)";
 "action.customize_folder" = "Personalizza cartella…";
 "action.sort_by" = "Ordina per";
 "action.show_view_options" = "Mostra opzioni Vista…";
@@ -135,6 +140,11 @@
 "tag.blue" = "Blu";
 "tag.purple" = "Viola";
 "tag.gray" = "Grigio";
+"tags.assign_title %@" = "Assegna tag a “%@”";
+"tags.assign_title_multiple %lld" = "Assegna tag a %lld elementi";
+"tags.filter_placeholder" = "";
+"tags.show_all" = "Mostra tutti…";
+"tags.show_less" = "Mostra meno";
 "settings.advanced.show_extensions" = "Mostra tutte le estensioni dei nomi file";
 "settings.advanced.warn_extension" = "Avvisa prima di cambiare un’estensione";
 "settings.advanced.warn_icloud" = "Avvisa prima di rimuovere elementi da iCloud Drive";
@@ -187,6 +197,7 @@
 "action.copy" = "Copia";
 "action.cut" = "Taglia";
 "action.paste" = "Incolla";
+"action.select_all" = "Seleziona tutto";
 "action.duplicate" = "Duplica";
 "action.copy_path" = "Copia percorso";
 "action.get_info" = "Ottieni informazioni";

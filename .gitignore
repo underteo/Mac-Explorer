@@ -11,6 +11,7 @@ dist/
 *.dSYM
 .swiftpm/
 .cursor/
+.build/
 
 .env
 .env.*

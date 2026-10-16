@@ -6,6 +6,8 @@ enum MenuActionPlacement: String, CaseIterable, Identifiable, Sendable {
     case context
     /// App menu bar → Azioni (separate from Finder’s menu).
     case actionsMenu
+    /// Both context menu and Azioni.
+    case both
     /// Not shown anywhere (action still available via shortcuts if any).
     case hidden
 
@@ -15,8 +17,17 @@ enum MenuActionPlacement: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .context: return L10n.tr("settings.menu.placement.context")
         case .actionsMenu: return L10n.tr("settings.menu.placement.actions")
+        case .both: return L10n.tr("settings.menu.placement.both")
         case .hidden: return L10n.tr("settings.menu.placement.hidden")
         }
+    }
+
+    var showsInContextMenu: Bool {
+        self == .context || self == .both
+    }
+
+    var showsInActionsMenu: Bool {
+        self == .actionsMenu || self == .both
     }
 }
 

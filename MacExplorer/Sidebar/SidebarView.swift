@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SidebarView: View {
@@ -14,8 +15,9 @@ struct SidebarView: View {
                     recentsSection
                 case .locations(let items):
                     Section(L10n.tr("sidebar.section.locations")) {
-                        ForEach(items) { destination in
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, destination in
                             locationRow(destination)
+                                .listRowBackground(SidebarStripe.background(at: index))
                         }
                     }
                 }
@@ -37,13 +39,14 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
                     .font(.caption)
             } else {
-                ForEach(app.favoriteItems) { favorite in
+                ForEach(Array(app.favoriteItems.enumerated()), id: \.element.id) { index, favorite in
                     Button {
                         navigate(to: favorite.url)
                     } label: {
-                        Label(favorite.name, systemImage: "star.fill")
+                        SidebarIconLabel(title: favorite.name, url: favorite.url)
                     }
                     .buttonStyle(.plain)
+                    .listRowBackground(SidebarStripe.background(at: index))
                     .contextMenu {
                         Button(L10n.tr("favorites.remove"), role: .destructive) {
                             app.removeFavorite(id: favorite.id)
@@ -62,13 +65,19 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
                     .font(.caption)
             } else {
-                ForEach(app.recentItems) { recent in
+                ForEach(Array(app.recentItems.enumerated()), id: \.element.id) { index, recent in
                     Button {
                         navigate(to: recent.url)
                     } label: {
-                        Label(recent.name, systemImage: "clock")
+                        // Finder keeps the clock badge for Recents.
+                        Label {
+                            Text(recent.name)
+                        } icon: {
+                            Image(systemName: "clock")
+                        }
                     }
                     .buttonStyle(.plain)
+                    .listRowBackground(SidebarStripe.background(at: index))
                 }
                 Button(L10n.tr("sidebar.recents.clear")) {
                     app.recentsStore.clear()
@@ -86,7 +95,11 @@ struct SidebarView: View {
                 navigate(to: url)
             }
         } label: {
-            Label(destination.localizedTitle, systemImage: destination.systemImage)
+            if let url = destination.resolveURL() {
+                SidebarIconLabel(title: destination.localizedTitle, url: url)
+            } else {
+                Label(destination.localizedTitle, systemImage: destination.systemImage)
+            }
         }
         .buttonStyle(.plain)
     }
@@ -105,6 +118,32 @@ struct SidebarView: View {
             tab.title = url.lastPathComponent
             app.selectedTab = tab
             app.recordRecent(url)
+        }
+    }
+}
+
+/// Finder-like subtle zebra in the sidebar.
+private enum SidebarStripe {
+    @ViewBuilder
+    static func background(at index: Int) -> some View {
+        let pair = NSColor.alternatingContentBackgroundColors
+        let ns = pair.indices.contains(index % 2) ? pair[index % 2] : NSColor.controlBackgroundColor
+        Color(nsColor: ns)
+    }
+}
+
+/// Label that uses the real `NSWorkspace` icon for the URL (Finder-like), not an SF Symbol.
+private struct SidebarIconLabel: View {
+    let title: String
+    let url: URL
+
+    var body: some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(nsImage: FileIconCache.systemIcon(for: url, size: 16))
+                .resizable()
+                .frame(width: 16, height: 16)
         }
     }
 }

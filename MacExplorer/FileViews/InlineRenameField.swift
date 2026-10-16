@@ -56,6 +56,7 @@ struct InlineRenameField: NSViewRepresentable {
         }
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var parent: InlineRenameField
         private var didFinish = false

@@ -16,13 +16,16 @@ Senior macOS engineer. Explain new concepts in simple Italian. One phase at a ti
 8. Do not bypass permissions or invent unavailable APIs.
 9. UI strings only via `Localizable.strings` / `L10n.tr` (en + it).
 10. Tests use temporary directories only — never the user’s real Documents.
-11. Keep the right-click menu lean; new actions go behind Settings → Menu placements (Context / Azioni / Hidden) unless the user asks otherwise.
-12. Reuse Finder system tags (`tagNames`); do not invent a parallel tag store.
-13. List = AppKit context menu; grid/columns = SwiftUI — same action set via shared builders; avoid double menus.
+11. Keep the right-click menu lean; new actions go behind Settings → Menu placements (Context / Azioni / Both / Hidden) unless the user asks otherwise.
+12. Reuse Finder system tags (`tagNames`); do not invent a parallel tag store. Tag colors = `NSColor.system*` (match Finder chrome), not `fileLabelColors`.
+13. List = AppKit outline + NSMenu; grid/columns = SwiftUI — same action set via shared builders; avoid double menus.
+14. Keep toolbar item membership stable (disable instead of remove) so capsules do not reshuffle.
+15. Prefer `NSWorkspace` icons for files/locations; SF Symbols only for chrome controls (nav, sort, …).
 
 ## Phase gate
 
-Each phase: G0 build → G1 `xcodebuild test` → G2 manual checklist for the user.
+Each phase: G0 `./scripts/build.sh` → G1 `./scripts/test.sh` → G2 manual checklist for the user.
+(Scripts export `DEVELOPER_DIR` to Xcode.app; do not rely on system `xcode-select` / CLT.)
 
 ## End-of-phase output
 

@@ -13,6 +13,7 @@ struct PathLocationBar: View {
         TextField(L10n.tr("path.placeholder"), text: $draftPath)
             .textFieldStyle(.plain)
             .font(.system(.body, design: .monospaced))
+            .foregroundStyle(.primary)
             .focused($fieldFocused)
             .focusEffectDisabled()
             .onSubmit(commitPath)
@@ -24,11 +25,11 @@ struct PathLocationBar: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 Capsule(style: .continuous)
-                    .fill(Color.primary.opacity(fieldFocused ? 0.10 : 0.06))
+                    .fill(Color.primary.opacity(fieldFocused ? 0.14 : 0.10))
             }
             .overlay {
                 Capsule(style: .continuous)
-                    .strokeBorder(Color.primary.opacity(fieldFocused ? 0.22 : 0.10), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(fieldFocused ? 0.28 : 0.16), lineWidth: 1)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

@@ -58,37 +58,11 @@ struct PaneBrowserView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Text(pane.currentURL.lastPathComponent)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .layoutPriority(1)
-                Spacer(minLength: 4)
-
-                if app.dualPaneEnabled {
-                    viewModePicker
-                }
-
-                Button {
-                    onActivate()
-                    if app.isFavorite(pane.currentURL) {
-                        app.removeFavorite(url: pane.currentURL)
-                    } else {
-                        _ = app.addFavorite(pane.currentURL)
-                    }
-                } label: {
-                    Image(systemName: app.isFavorite(pane.currentURL) ? "star.fill" : "star")
-                }
-                .buttonStyle(.borderless)
-                .help(app.isFavorite(pane.currentURL) ? L10n.tr("favorites.remove") : L10n.tr("favorites.add"))
-                .accessibilityLabel(app.isFavorite(pane.currentURL) ? L10n.tr("favorites.remove") : L10n.tr("favorites.add"))
-
-                sortMenu
+            // Dual-pane only: name + view switcher. Single-pane already has path bar / toolbar
+            // (extra strip here looked like empty dead space above column headers).
+            if app.dualPaneEnabled {
+                paneChrome
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .contentShape(Rectangle())
-            .onTapGesture { onActivate() }
 
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -102,18 +76,54 @@ struct PaneBrowserView: View {
         }
     }
 
-    private var viewModePicker: some View {
-        Picker(L10n.tr("toolbar.view"), selection: $pane.viewMode) {
-            Image(systemName: "square.grid.2x2").tag(FileViewMode.grid)
-            Image(systemName: "list.bullet").tag(FileViewMode.list)
-            Image(systemName: "rectangle.split.3x1").tag(FileViewMode.columns)
+    private var paneChrome: some View {
+        HStack(spacing: 8) {
+            Text(pane.currentURL.lastPathComponent)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .layoutPriority(1)
+            Spacer(minLength: 4)
+
+            ExplorerViewModePicker(viewMode: $pane.viewMode, compact: true)
+
+            Button {
+                onActivate()
+                if app.isFavorite(pane.currentURL) {
+                    app.removeFavorite(url: pane.currentURL)
+                } else {
+                    _ = app.addFavorite(pane.currentURL)
+                }
+            } label: {
+                Image(systemName: app.isFavorite(pane.currentURL) ? "star.fill" : "star")
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.borderless)
+            .help(app.isFavorite(pane.currentURL) ? L10n.tr("favorites.remove") : L10n.tr("favorites.add"))
+            .accessibilityLabel(app.isFavorite(pane.currentURL) ? L10n.tr("favorites.remove") : L10n.tr("favorites.add"))
+
+            ExplorerSortMenu(
+                sortKey: pane.sortKey,
+                sortAscending: pane.sortAscending,
+                onSelectKey: { key in
+                    pane.sortKey = key
+                    onRefresh()
+                },
+                onToggleAscending: {
+                    pane.sortAscending.toggle()
+                    onRefresh()
+                },
+                borderless: true
+            )
         }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .controlSize(.small)
-        .frame(maxWidth: 118)
-        .help(L10n.tr("toolbar.view"))
-        .accessibilityLabel(L10n.tr("toolbar.view"))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.bar)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { onActivate() }
     }
 
     @ViewBuilder
@@ -132,20 +142,10 @@ struct PaneBrowserView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contextMenu { backgroundMenu }
-        } else if displayedItems.isEmpty {
-            ExplorerEmptyState(
-                title: L10n.tr("state.empty.title"),
-                systemImage: "folder",
-                message: L10n.tr("state.empty.message"),
-                actionTitle: L10n.tr("toolbar.open_folder"),
-                action: {
-                    NotificationCenter.default.post(name: .explorerOpenFolder, object: nil)
-                }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .contextMenu { backgroundMenu }
         } else if pane.viewMode == .columns {
+            // Keep the column browser mounted even when the focused leaf is empty —
+            // otherwise navigating into an empty folder replaces the whole chain with
+            // the full-pane empty state (and looks like “losing” columns).
             FileColumnView(
                 directoryURL: pane.currentURL,
                 items: displayedItems,
@@ -168,6 +168,16 @@ struct PaneBrowserView: View {
                 itemMenu: { item in selectionMenu(urls: [item.url]) },
                 backgroundMenu: { backgroundMenu }
             )
+        } else if displayedItems.isEmpty {
+            // Empty folder in-place (no “Open Folder” CTA) so New File / New Folder work via menu/toolbar.
+            ExplorerEmptyState(
+                title: L10n.tr("state.empty.title"),
+                systemImage: "folder",
+                message: L10n.tr("state.empty.message")
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .contextMenu { backgroundMenu }
         } else if pane.viewMode == .grid {
             FileGridView(
                 items: displayedItems,
@@ -185,6 +195,8 @@ struct PaneBrowserView: View {
                 items: displayedItems,
                 selection: $pane.selectedURLs,
                 directoryURL: pane.currentURL,
+                sortKey: pane.sortKey,
+                sortAscending: pane.sortAscending,
                 onOpen: onOpen,
                 renameURL: renameURL,
                 renameText: $renameText,
@@ -214,33 +226,6 @@ struct PaneBrowserView: View {
         )
     }
 
-    private var sortMenu: some View {
-        Menu {
-            ForEach(FileSortKey.allCases) { key in
-                Button {
-                    pane.sortKey = key
-                    onRefresh()
-                } label: {
-                    if pane.sortKey == key {
-                        Label(L10n.tr("sort.\(key.rawValue)"), systemImage: "checkmark")
-                    } else {
-                        Text(L10n.tr("sort.\(key.rawValue)"))
-                    }
-                }
-            }
-            Divider()
-            Button {
-                pane.sortAscending.toggle()
-                onRefresh()
-            } label: {
-                Text(pane.sortAscending ? L10n.tr("sort.descending") : L10n.tr("sort.ascending"))
-            }
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-        .help(L10n.tr("toolbar.sort"))
-        .accessibilityLabel(L10n.tr("toolbar.sort"))
-    }
 }
 
 extension Notification.Name {

@@ -1,13 +1,15 @@
 import SwiftUI
 import AppKit
 
-/// Row-based file list. Uses a native `NSTableView` so selection highlight matches Finder timing.
+/// Row-based file list with Finder-like folder expansion (outline).
 struct FileListView: View {
     @EnvironmentObject private var app: AppModel
     @EnvironmentObject private var settings: AppSettings
     let items: [FileItem]
     @Binding var selection: Set<URL>
     let directoryURL: URL
+    var sortKey: FileSortKey = .name
+    var sortAscending: Bool = true
     let onOpen: (FileItem) -> Void
     var renameURL: URL?
     @Binding var renameText: String
@@ -18,6 +20,10 @@ struct FileListView: View {
     var body: some View {
         NativeFileTableView(
             items: items,
+            sortKey: sortKey,
+            sortAscending: sortAscending,
+            keepFoldersOnTop: settings.keepFoldersOnTop(directory: directoryURL, sortKey: sortKey),
+            includeHiddenFiles: app.showHiddenFiles,
             selection: $selection,
             renameURL: renameURL,
             renameText: $renameText,

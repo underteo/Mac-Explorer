@@ -85,6 +85,7 @@ final class AppSettings: ObservableObject {
         static let openInTabs = "settings.openFoldersInTabs"
         static let sidebarVisible = "settings.sidebarVisibleItems"
         static let sidebarOrder = "settings.sidebarOrder"
+        static let sidebarMigratedMacintoshHD = "settings.sidebarMigratedMacintoshHD"
         static let showAllExtensions = "settings.showAllFilenameExtensions"
         static let warnExtension = "settings.warnBeforeChangingExtension"
         static let warniCloud = "settings.warnBeforeRemovingFromiCloud"
@@ -114,6 +115,7 @@ final class AppSettings: ObservableObject {
     static let defaultSidebarVisible: Set<String> = Set([
         SidebarDestination.recents.rawValue,
         SidebarDestination.favorites.rawValue,
+        SidebarDestination.macintoshHD.rawValue,
         SidebarDestination.applications.rawValue,
         SidebarDestination.desktop.rawValue,
         SidebarDestination.documents.rawValue,
@@ -122,9 +124,10 @@ final class AppSettings: ObservableObject {
         SidebarDestination.trash.rawValue
     ])
 
-    /// Default order: Favorites → locations → Recents.
+    /// Default order: Favorites → locations (Macintosh HD first) → Recents.
     static let defaultSidebarOrder: [String] = [
         SidebarDestination.favorites.rawValue,
+        SidebarDestination.macintoshHD.rawValue,
         SidebarDestination.applications.rawValue,
         SidebarDestination.desktop.rawValue,
         SidebarDestination.documents.rawValue,
@@ -235,17 +238,37 @@ final class AppSettings: ObservableObject {
             self.openFoldersInTabs = defaults.bool(forKey: Keys.openInTabs)
         }
 
+        var visibleItems: Set<String>
         if let saved = defaults.array(forKey: Keys.sidebarVisible) as? [String] {
-            self.sidebarVisibleItems = Set(saved)
+            visibleItems = Set(saved)
         } else {
-            self.sidebarVisibleItems = Self.defaultSidebarVisible
+            visibleItems = Self.defaultSidebarVisible
         }
 
+        var orderItems: [String]
         if let savedOrder = defaults.array(forKey: Keys.sidebarOrder) as? [String], !savedOrder.isEmpty {
-            self.sidebarOrder = Self.normalizedSidebarOrder(savedOrder)
+            orderItems = Self.normalizedSidebarOrder(savedOrder)
         } else {
-            self.sidebarOrder = Self.defaultSidebarOrder
+            orderItems = Self.defaultSidebarOrder
         }
+
+        // One-shot: show Macintosh HD for existing installs that never had this destination.
+        if !defaults.bool(forKey: Keys.sidebarMigratedMacintoshHD) {
+            defaults.set(true, forKey: Keys.sidebarMigratedMacintoshHD)
+            let hd = SidebarDestination.macintoshHD.rawValue
+            if !orderItems.contains(hd) {
+                if let fav = orderItems.firstIndex(of: SidebarDestination.favorites.rawValue) {
+                    orderItems.insert(hd, at: fav + 1)
+                } else {
+                    orderItems.insert(hd, at: 0)
+                }
+                orderItems = Self.normalizedSidebarOrder(orderItems)
+            }
+            visibleItems.insert(hd)
+        }
+
+        self.sidebarVisibleItems = visibleItems
+        self.sidebarOrder = orderItems
 
         self.showAllFilenameExtensions = defaults.object(forKey: Keys.showAllExtensions) as? Bool ?? true
         self.warnBeforeChangingExtension = defaults.object(forKey: Keys.warnExtension) as? Bool ?? true
@@ -292,11 +315,11 @@ final class AppSettings: ObservableObject {
     }
 
     func showsInContextMenu(_ action: ContextMenuActionID) -> Bool {
-        placement(for: action) == .context
+        placement(for: action).showsInContextMenu
     }
 
     func showsInActionsMenu(_ action: ContextMenuActionID) -> Bool {
-        placement(for: action) == .actionsMenu
+        placement(for: action).showsInActionsMenu
     }
 
     func resetMenuPlacements() {
@@ -399,7 +422,18 @@ final class AppSettings: ObservableObject {
             result.append(raw)
         }
         for destination in SidebarDestination.allCases where !seen.contains(destination.rawValue) {
-            result.append(destination.rawValue)
+            if destination == .macintoshHD {
+                if let fav = result.firstIndex(of: SidebarDestination.favorites.rawValue) {
+                    result.insert(destination.rawValue, at: fav + 1)
+                } else if let apps = result.firstIndex(of: SidebarDestination.applications.rawValue) {
+                    result.insert(destination.rawValue, at: apps)
+                } else {
+                    result.append(destination.rawValue)
+                }
+                seen.insert(destination.rawValue)
+            } else {
+                result.append(destination.rawValue)
+            }
         }
         return result
     }

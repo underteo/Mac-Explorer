@@ -83,7 +83,7 @@ private struct FileGridCell: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(nsImage: FileIconCache.icon(for: item.url, size: 48))
+            Image(nsImage: FileIconCache.icon(for: item, size: 48))
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 48, height: 48)
@@ -102,6 +102,8 @@ private struct FileGridCell: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
             }
+
+            FinderTagDotsIndicator(colors: item.finderColorTags, diameter: 7, spacing: 2)
         }
         .padding(8)
         .frame(maxWidth: .infinity)

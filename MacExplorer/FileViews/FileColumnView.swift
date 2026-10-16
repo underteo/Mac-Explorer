@@ -67,8 +67,8 @@ struct FileColumnView<ItemMenu: View, BackgroundMenu: View>: View {
     private func columnPane(index: Int, column: ColumnModel) -> some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(column.items) { item in
-                    columnRow(item: item, columnIndex: index)
+                ForEach(Array(column.items.enumerated()), id: \.element.id) { rowIndex, item in
+                    columnRow(item: item, columnIndex: index, rowIndex: rowIndex)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,20 +79,21 @@ struct FileColumnView<ItemMenu: View, BackgroundMenu: View>: View {
     }
 
     @ViewBuilder
-    private func columnRow(item: FileItem, columnIndex: Int) -> some View {
+    private func columnRow(item: FileItem, columnIndex: Int, rowIndex: Int) -> some View {
         let deepest = deepestSelectedURL
         let isPathSelected = columns.indices.contains(columnIndex)
             && columns[columnIndex].selectedChildURL == item.url
         let isLeafSelected = item.url == deepest
+        let stripe = Self.alternatingRowColor(at: rowIndex)
         let highlight: Color = {
             if isLeafSelected { return Color.accentColor }
             if isPathSelected { return Color.primary.opacity(0.12) }
-            return .clear
+            return stripe
         }()
         let listed = item.listedName(showExtension: settings.showAllFilenameExtensions)
 
         HStack(spacing: 6) {
-            Image(nsImage: FileIconCache.icon(for: item.url, size: 16))
+            Image(nsImage: FileIconCache.icon(for: item, size: 16))
                 .resizable()
                 .frame(width: 16, height: 16)
 
@@ -111,6 +112,8 @@ struct FileColumnView<ItemMenu: View, BackgroundMenu: View>: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
+            FinderTagDotsIndicator(colors: item.finderColorTags, diameter: 7, spacing: 2)
+
             if item.isDirectory, !isFlat {
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))
@@ -119,6 +122,7 @@ struct FileColumnView<ItemMenu: View, BackgroundMenu: View>: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(highlight)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
@@ -147,6 +151,13 @@ struct FileColumnView<ItemMenu: View, BackgroundMenu: View>: View {
             return selected
         }
         return columns.reversed().compactMap(\.selectedChildURL).first
+    }
+
+    /// Same system zebra pair as list view (`NSColor.alternatingContentBackgroundColors`).
+    private static func alternatingRowColor(at index: Int) -> Color {
+        let pair = NSColor.alternatingContentBackgroundColors
+        let ns = pair.indices.contains(index % 2) ? pair[index % 2] : NSColor.controlBackgroundColor
+        return Color(nsColor: ns)
     }
 
     private func select(_ item: FileItem, inColumn columnIndex: Int) {
@@ -222,19 +233,82 @@ struct FileColumnView<ItemMenu: View, BackgroundMenu: View>: View {
             return
         }
 
-        if let last = columns.last,
-           focused.path.hasPrefix(last.directoryURL.standardizedFileURL.path + "/") {
-            // Deeper navigation from outside (e.g. path bar) — reset to a single focused column.
-            columns = [
-                ColumnModel(directoryURL: focused, items: items, selectedChildURL: selection.first)
-            ]
-            scrollToken = UUID()
-            return
+        if let last = columns.last {
+            let lastPath = last.directoryURL.standardizedFileURL.path
+            if focused.path == lastPath || focused.path.hasPrefix(lastPath + "/") {
+                // Deeper navigation from outside (double-click / path bar): extend the chain
+                // instead of collapsing to a single column.
+                Task { @MainActor in
+                    await extendColumns(from: columns, to: focused, leafItems: items)
+                }
+                return
+            }
         }
 
         columns = [
             ColumnModel(directoryURL: focused, items: items, selectedChildURL: selection.first)
         ]
+        scrollToken = UUID()
+    }
+
+    @MainActor
+    private func extendColumns(from existing: [ColumnModel], to focused: URL, leafItems: [FileItem]) async {
+        var next = existing
+        let focusedStd = focused.standardizedFileURL
+
+        if let idx = next.firstIndex(where: { $0.directoryURL.standardizedFileURL == focusedStd }) {
+            next = Array(next.prefix(idx + 1))
+            next[idx].items = leafItems
+            columns = next
+            scrollToken = UUID()
+            return
+        }
+
+        guard let last = next.last else {
+            columns = [ColumnModel(directoryURL: focusedStd, items: leafItems, selectedChildURL: selection.first)]
+            scrollToken = UUID()
+            return
+        }
+
+        let lastStd = last.directoryURL.standardizedFileURL
+        guard focusedStd.path.hasPrefix(lastStd.path + "/") else {
+            columns = [ColumnModel(directoryURL: focusedStd, items: leafItems, selectedChildURL: selection.first)]
+            scrollToken = UUID()
+            return
+        }
+
+        let relative = String(focusedStd.path.dropFirst(lastStd.path.count))
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let components = relative.split(separator: "/").map(String.init)
+        guard !components.isEmpty else {
+            columns = [ColumnModel(directoryURL: focusedStd, items: leafItems, selectedChildURL: selection.first)]
+            scrollToken = UUID()
+            return
+        }
+
+        var cursor = lastStd
+        for (i, name) in components.enumerated() {
+            let child = cursor.appendingPathComponent(name, isDirectory: true).standardizedFileURL
+            if let colIdx = next.indices.last {
+                next[colIdx].selectedChildURL = child
+            }
+            let isLeaf = i == components.count - 1
+            let listed: [FileItem]
+            if isLeaf {
+                listed = leafItems
+            } else {
+                do {
+                    listed = try loadItems(of: child)
+                } catch {
+                    app.lastErrorMessage = error.localizedDescription
+                    break
+                }
+            }
+            next.append(ColumnModel(directoryURL: child, items: listed, selectedChildURL: nil))
+            cursor = child
+        }
+
+        columns = next
         scrollToken = UUID()
     }
 

@@ -1,5 +1,6 @@
 /* Sidebar */
 "sidebar.home" = "Home";
+"sidebar.macintoshHD" = "Macintosh HD";
 "sidebar.desktop" = "Desktop";
 "sidebar.documents" = "Documents";
 "sidebar.downloads" = "Downloads";
@@ -21,6 +22,9 @@
 "toolbar.dual_pane" = "Dual Pane";
 "toolbar.copy_to_other" = "Copy to Other Pane";
 "toolbar.move_to_other" = "Move to Other Pane";
+"toolbar.share" = "Share";
+"toolbar.more" = "More";
+"toolbar.selection_actions" = "Selection Actions";
 "path.edit" = "Edit Path";
 "path.placeholder" = "Enter a folder path";
 "path.invalid" = "That path is not an accessible folder.";
@@ -105,10 +109,11 @@
 "settings.menu" = "Menus";
 "action.menu_settings" = "Settings…";
 "settings.menu.header" = "Choose where each action appears:";
-"settings.menu.footer" = "Context = right-click menu. Actions = Mac Explorer’s Azioni menu (not Finder). Hidden removes it from both.";
+"settings.menu.footer" = "Context = right-click. Actions = the Azioni menu. Both = context and Actions. Hidden removes it from both.";
 "settings.menu.reset" = "Reset to Defaults";
 "settings.menu.placement.context" = "Context";
 "settings.menu.placement.actions" = "Actions menu";
+"settings.menu.placement.both" = "Both";
 "settings.menu.placement.hidden" = "Hidden";
 "menu.actions" = "Actions";
 "action.open_in_new_pane" = "Open in New Pane";
@@ -117,7 +122,7 @@
 "action.make_alias" = "Make Alias";
 "action.quick_look" = "Quick Look";
 "action.tags" = "Tags";
-"action.tags_hint" = "Tags: use the context menu (or move Tags to Context in Settings)";
+"action.tags_hint" = "Tags: use the context menu (or set Tags to Context/Both in Settings)";
 "action.customize_folder" = "Customize Folder…";
 "action.sort_by" = "Sort By";
 "action.show_view_options" = "Show View Options…";
@@ -135,6 +140,11 @@
 "tag.blue" = "Blue";
 "tag.purple" = "Purple";
 "tag.gray" = "Gray";
+"tags.assign_title %@" = "Assign Tags to “%@”";
+"tags.assign_title_multiple %lld" = "Assign Tags to %lld Items";
+"tags.filter_placeholder" = "";
+"tags.show_all" = "Show All…";
+"tags.show_less" = "Show Less";
 "settings.advanced.show_extensions" = "Show all filename extensions";
 "settings.advanced.warn_extension" = "Show warning before changing an extension";
 "settings.advanced.warn_icloud" = "Show warning before removing items from iCloud Drive";
@@ -187,6 +197,7 @@
 "action.copy" = "Copy";
 "action.cut" = "Cut";
 "action.paste" = "Paste";
+"action.select_all" = "Select All";
 "action.duplicate" = "Duplicate";
 "action.copy_path" = "Copy Path";
 "action.get_info" = "Get Info";

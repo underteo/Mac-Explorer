@@ -27,13 +27,12 @@ Open the project:
 open "/Users/matteocazzoli/IA/Mac Explorer/MacExplorer.xcodeproj"
 ```
 
-Or build from the terminal:
+Or from the terminal (scripts set `DEVELOPER_DIR` to Xcode.app so CLT is not used):
 
 ```bash
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-cd "/Users/matteocazzoli/IA/Mac Explorer"
-xcodebuild -scheme MacExplorer -configuration Debug build
-xcodebuild -scheme MacExplorer -configuration Debug test
+./scripts/build.sh
+./scripts/test.sh
+./scripts/install_to_applications.sh   # Release → /Applications, stable signing
 ```
 
 Run in Xcode with **⌘R**.
@@ -42,26 +41,29 @@ Run in Xcode with **⌘R**.
 
 ### Browsing
 
-- Sidebar: Favorites and Locations above Recents; visibility and **order** in Settings → Sidebar
-- View modes: **icons (grid)**, **list**, **columns** (Finder-style); dual-pane can use a different mode per pane
+- Sidebar: Favorites and Locations above Recents; visibility and **order** in Settings → Sidebar; location rows use **system folder/volume icons** (`NSWorkspace`)
+- View modes: **icons (grid)**, **list** (outline: expand folders in place, open-folder icon when expanded), **columns** (Finder-style drill-down); dual-pane can use a different mode per pane
+- List and columns use **alternating row colors** (system `alternatingContentBackgroundColors`)
+- Toolbar is stable (no buttons that appear/disappear): empty Trash and pane transfer stay visible but disabled when N/A; view/sort/favorite always present
+- **Share / Tags / More** live beside the path bar (not mixed into the window toolbar capsule)
 - Sort, search (current folder or this Mac — Settings → Advanced), show hidden files
-- Editable path bar in a capsule (click to edit, Return to go); no focus steal on open
-- Back / forward / up, tabs
+- Editable path bar in a capsule (click to edit, Return / ⌘A while editing); no focus steal on open
+- Back / forward / up, tabs; folders open **in-pane** (tabs preference does not hijack double-click / column drill)
 
 ### File operations
 
 - New folder / file templates, rename, duplicate, copy / cut / paste, Trash
 - Get Info, copy path, Open With (Launch Services)
 - Optional dual pane with copy / move between panes (source = active selection)
-- Finder **color tags** (same `tagNames` as Finder); toggle from the context menu
-- Extra actions available via menu bar **Azioni** and/or context menu (see below): compress, make alias, Quick Look, open in other pane, Terminal at folder, …
+- Finder **color tags** (same `tagNames` as Finder): semantic **system colors** (`systemRed`…`systemPurple`), dots next to names, icon wash, assign popover, menu dots (no disclosure chevron on sort / more)
+- Extra actions via menu bar **Azioni** and/or context menu (see Settings → Menu): compress, make alias, Quick Look, open in other pane, Terminal at folder, …
 
 ### Settings
 
 - **General** — language, zoom, new-window location, open folders in tabs, privacy links (FDA)
 - **Sidebar** — show/hide and reorder items
 - **Advanced** — Finder-like options: show extensions, rename/extension warnings, iCloud / empty-Trash warnings, Trash after 30 days (syncs Finder preference when possible), keep folders on top, default search scope
-- **Menu** — for each action choose **Context** (right-click), **Actions menu**, or **Hidden**. Right-click → **Settings…** / **Impostazioni…** opens this tab
+- **Menu** — for each action choose **Context** (right-click), **Actions menu**, **Both**, or **Hidden**. Right-click → **Settings…** / **Impostazioni…** opens this tab
 - **Plugins** — enable / disable, reload, reveal folder
 
 ### Extensibility

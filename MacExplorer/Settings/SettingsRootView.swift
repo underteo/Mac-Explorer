@@ -118,7 +118,7 @@ struct MenuActionsSettingsView: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 160)
+                        .frame(width: 168)
                     }
                 }
             }

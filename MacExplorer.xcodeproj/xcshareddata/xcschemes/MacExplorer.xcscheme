@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "09778491CACA4BC79BBD4575"
+               BlueprintIdentifier = "3AD29926A4B0497D8F530839"
                BuildableName = "MacExplorer.app"
                BlueprintName = "MacExplorer"
                ReferencedContainer = "container:MacExplorer.xcodeproj">
@@ -34,7 +34,7 @@
             parallelizable = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "699E5F213F8443C3BF82221B"
+               BlueprintIdentifier = "1D0335B3E14046D18BF187B2"
                BuildableName = "MacExplorerTests.xctest"
                BlueprintName = "MacExplorerTests"
                ReferencedContainer = "container:MacExplorer.xcodeproj">
@@ -56,7 +56,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "09778491CACA4BC79BBD4575"
+            BlueprintIdentifier = "3AD29926A4B0497D8F530839"
             BuildableName = "MacExplorer.app"
             BlueprintName = "MacExplorer"
             ReferencedContainer = "container:MacExplorer.xcodeproj">
@@ -73,7 +73,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "09778491CACA4BC79BBD4575"
+            BlueprintIdentifier = "3AD29926A4B0497D8F530839"
             BuildableName = "MacExplorer.app"
             BlueprintName = "MacExplorer"
             ReferencedContainer = "container:MacExplorer.xcodeproj">

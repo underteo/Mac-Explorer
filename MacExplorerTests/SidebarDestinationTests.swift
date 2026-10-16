@@ -20,6 +20,8 @@ final class SidebarDestinationTests: XCTestCase {
 
     func testLocationsSectionContainsFolderShortcuts() {
         let locations = SidebarSettingsSection.locations.items
+        XCTAssertTrue(locations.contains(.macintoshHD))
+        XCTAssertEqual(SidebarDestination.macintoshHD.resolveURL()?.path, "/")
         XCTAssertTrue(locations.contains(.desktop))
         XCTAssertTrue(locations.contains(.documents))
         XCTAssertTrue(locations.contains(.home))

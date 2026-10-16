@@ -39,29 +39,22 @@ enum FinderColorTag: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var color: Color {
+    /// Finder tag swatches use the semantic system colors (same family as Finder’s
+    /// colored folders / dots). `NSWorkspace.fileLabelColors` is the older pastel
+    /// label palette and does not match modern Finder tag chrome.
+    var nsColor: NSColor {
         switch self {
-        case .red: return Color(red: 0.92, green: 0.30, blue: 0.28)
-        case .orange: return Color(red: 0.96, green: 0.58, blue: 0.20)
-        case .yellow: return Color(red: 0.97, green: 0.80, blue: 0.20)
-        case .green: return Color(red: 0.40, green: 0.78, blue: 0.35)
-        case .blue: return Color(red: 0.30, green: 0.55, blue: 0.95)
-        case .purple: return Color(red: 0.68, green: 0.40, blue: 0.90)
-        case .gray: return Color(red: 0.65, green: 0.65, blue: 0.68)
+        case .red: return .systemRed
+        case .orange: return .systemOrange
+        case .yellow: return .systemYellow
+        case .green: return .systemGreen
+        case .blue: return .systemBlue
+        case .purple: return .systemPurple
+        case .gray: return .systemGray
         }
     }
 
-    var nsColor: NSColor {
-        switch self {
-        case .red: return NSColor(calibratedRed: 0.92, green: 0.30, blue: 0.28, alpha: 1)
-        case .orange: return NSColor(calibratedRed: 0.96, green: 0.58, blue: 0.20, alpha: 1)
-        case .yellow: return NSColor(calibratedRed: 0.97, green: 0.80, blue: 0.20, alpha: 1)
-        case .green: return NSColor(calibratedRed: 0.40, green: 0.78, blue: 0.35, alpha: 1)
-        case .blue: return NSColor(calibratedRed: 0.30, green: 0.55, blue: 0.95, alpha: 1)
-        case .purple: return NSColor(calibratedRed: 0.68, green: 0.40, blue: 0.90, alpha: 1)
-        case .gray: return NSColor(calibratedRed: 0.65, green: 0.65, blue: 0.68, alpha: 1)
-        }
-    }
+    var color: Color { Color(nsColor: nsColor) }
 
     static func matching(_ name: String) -> FinderColorTag? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -86,20 +79,53 @@ enum FinderTags {
 
     /// Toggle a Finder color tag on all URLs (shared system tags with Finder).
     static func toggle(_ color: FinderColorTag, on urls: [URL]) throws {
+        try toggle(named: color.rawValue, on: urls)
+    }
+
+    /// Toggle a tag by name (color or custom). Shared with Finder via `tagNames`.
+    static func toggle(named name: String, on urls: [URL]) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let canonical = FinderColorTag.matching(trimmed)?.rawValue ?? trimmed
         for url in urls {
             var tags = read(from: url)
-            if let existing = tags.first(where: { FinderColorTag.matching($0) == color }) {
+            if let existing = tags.first(where: { $0.caseInsensitiveCompare(canonical) == .orderedSame
+                || (FinderColorTag.matching($0) != nil && FinderColorTag.matching($0) == FinderColorTag.matching(canonical)) }) {
                 tags.removeAll { $0.caseInsensitiveCompare(existing) == .orderedSame }
             } else {
-                // Prefer English raw value — Finder accepts it and syncs across locales.
-                tags.append(color.rawValue)
+                tags.append(canonical)
             }
+            try write(tags, to: url)
+        }
+    }
+
+    static func add(named name: String, to urls: [URL]) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let canonical = FinderColorTag.matching(trimmed)?.rawValue ?? trimmed
+        for url in urls {
+            var tags = read(from: url)
+            if tags.contains(where: { $0.caseInsensitiveCompare(canonical) == .orderedSame }) { continue }
+            tags.append(canonical)
             try write(tags, to: url)
         }
     }
 
     static func isOn(_ color: FinderColorTag, for url: URL) -> Bool {
         read(from: url).contains { FinderColorTag.matching($0) == color }
+    }
+
+    /// Finder’s favorite / sidebar tags when available (same list “Show All” expands).
+    static func favoriteTagNames() -> [String] {
+        let defaults = UserDefaults(suiteName: "com.apple.finder") ?? .standard
+        if let names = defaults.array(forKey: "FavoriteTagNames") as? [String] {
+            return names.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        }
+        // Older / alternate key used on some macOS builds.
+        if let names = defaults.array(forKey: "FavoriteTags") as? [String] {
+            return names.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        }
+        return []
     }
 
     static func colors(in tagNames: [String]) -> [FinderColorTag] {

@@ -15,6 +15,8 @@ struct ExplorerRootView: View {
     @State private var renameText = ""
     @State private var collisionAlert: String?
     @State private var pendingCollision: PendingCollision?
+    @State private var showTagsPopover = false
+    @State private var showMorePopover = false
 
     var body: some View {
         rootChrome
@@ -54,16 +56,19 @@ struct ExplorerRootView: View {
     }
 
     private var rootChrome: some View {
-        VStack(spacing: 0) {
-            tabBar
-            pathBar
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                SidebarView()
-            } detail: {
+        // Path/tabs belong in the detail column. Putting them above NavigationSplitView
+        // made the detail reserve a second empty toolbar band (looked like dead space
+        // above Nome/Data/…).
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            SidebarView()
+        } detail: {
+            VStack(spacing: 0) {
+                tabBar
+                pathBar
                 detailContent
             }
         }
-        .navigationTitle(app.selectedTab.pane.currentURL.lastPathComponent)
+        .navigationTitle("")
         .toolbar { toolbarContent }
         .searchable(text: bindingSearchQuery, prompt: Text(L10n.tr("search.prompt")))
         .onSubmit(of: .search) {
@@ -154,6 +159,9 @@ struct ExplorerRootView: View {
             if pasteIntoFocusedTextField() { return }
             let destination = object as? URL
             Task { await pasteClipboard(to: destination) }
+        case .explorerSelectAll:
+            if selectAllFocusedText() { return }
+            selectAllFilesInActivePane()
         case .explorerDuplicate:
             guard !app.isEditingText else { return }
             Task { await duplicateSelection() }
@@ -255,15 +263,34 @@ struct ExplorerRootView: View {
     }
 
     private var pathBar: some View {
-        PathLocationBar(
-            url: app.activePane.currentURL,
-            onNavigate: { url in
-                Task { await navigateActivePane(to: url) }
-            },
-            onEditingChanged: { editing in
-                app.isEditingText = editing
-            }
-        )
+        // Selection actions live here (not in the window toolbar) so Share/Tags/More
+        // never reshuffle with view/sort capsules when the selection or dual-pane changes.
+        HStack(spacing: 10) {
+            PathLocationBar(
+                url: app.activePane.currentURL,
+                onNavigate: { url in
+                    Task { await navigateActivePane(to: url) }
+                },
+                onEditingChanged: { editing in
+                    app.isEditingText = editing
+                }
+            )
+            .frame(maxWidth: .infinity)
+
+            ExplorerSelectionActionsBar(
+                selectedURLs: selectedURLs(),
+                tagsPopoverTitle: tagsPopoverTitle,
+                showTagsPopover: $showTagsPopover,
+                showMorePopover: $showMorePopover,
+                onShare: { presentSharePicker() },
+                onRefresh: { Task { await refreshActivePanes() } },
+                onNewFolder: { createNewFolder() },
+                onCompress: { Task { await compressSelection() } },
+                onMakeAlias: { Task { await makeAliasSelection() } },
+                onQuickLook: { quickLookSelection() }
+            )
+        }
+        .padding(.trailing, 8)
         .background(.bar)
         .id(app.activePaneID)
     }
@@ -351,137 +378,99 @@ struct ExplorerRootView: View {
         )
     }
 
-    @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
-            Button {
-                Task { await goBackPrimary() }
-            } label: {
-                Image(systemName: "chevron.backward")
-            }
-            .disabled(!app.primaryPane.history.canGoBack)
-            .help(L10n.tr("command.back"))
-            .accessibilityLabel(L10n.tr("command.back"))
-
-            Button {
-                Task { await goForwardPrimary() }
-            } label: {
-                Image(systemName: "chevron.forward")
-            }
-            .disabled(!app.primaryPane.history.canGoForward)
-            .help(L10n.tr("command.forward"))
-            .accessibilityLabel(L10n.tr("command.forward"))
-
-            Button {
-                Task { await goUpPrimary() }
-            } label: {
-                Image(systemName: "chevron.up")
-            }
-            .disabled(app.primaryPane.currentURL.path == "/")
-            .help(L10n.tr("command.enclosing_folder"))
-            .accessibilityLabel(L10n.tr("command.enclosing_folder"))
-        }
-
-        ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-                openFolderPanel()
-            } label: {
-                Label(L10n.tr("toolbar.open_folder"), systemImage: "folder.badge.plus")
-            }
-            .help(L10n.tr("toolbar.open_folder"))
-            .accessibilityLabel(L10n.tr("toolbar.open_folder"))
-
-            Button {
-                createNewFolder()
-            } label: {
-                Label(L10n.tr("action.new_folder"), systemImage: "plus.rectangle.on.folder")
-            }
-            .help(L10n.tr("action.new_folder"))
-            .accessibilityLabel(L10n.tr("action.new_folder"))
-
-            Button {
-                Task { await refreshPrimary() }
-            } label: {
-                Label(L10n.tr("toolbar.refresh"), systemImage: "arrow.clockwise")
-            }
-            .help(L10n.tr("toolbar.refresh"))
-            .accessibilityLabel(L10n.tr("toolbar.refresh"))
-
-            if FileItem.isTrashURL(app.activePane.currentURL) {
-                Button {
-                    requestEmptyTrash()
-                } label: {
-                    Label(L10n.tr("action.empty_trash"), systemImage: "trash.slash")
-                }
-                .help(L10n.tr("action.empty_trash"))
-                .accessibilityLabel(L10n.tr("action.empty_trash"))
-            }
-
-            Toggle(isOn: $app.showHiddenFiles) {
-                Image(systemName: "eye")
-            }
-            .toggleStyle(.button)
-            .help(L10n.tr("command.toggle_hidden"))
-            .accessibilityLabel(L10n.tr("command.toggle_hidden"))
-            .onChange(of: app.showHiddenFiles) { _, _ in
+        ExplorerToolbar(
+            onGoBack: { Task { await goBackPrimary() } },
+            onGoForward: { Task { await goForwardPrimary() } },
+            onGoUp: { Task { await goUpPrimary() } },
+            onOpenFolder: { openFolderPanel() },
+            onNewFolder: { createNewFolder() },
+            onRefresh: { Task { await refreshPrimary() } },
+            onEmptyTrash: { requestEmptyTrash() },
+            onHiddenFilesChanged: {
                 Task {
                     await refreshPrimary()
                     if app.dualPaneEnabled { await refreshSecondary() }
                 }
-            }
-
-            // Dual-pane: each pane has its own view switcher in the pane header.
-            // Toolbar still mirrors the active pane for single-pane / keyboard focus.
-            if !app.dualPaneEnabled {
-                Picker(L10n.tr("toolbar.view"), selection: Binding(
-                    get: { app.primaryPane.viewMode },
-                    set: {
-                        var pane = app.primaryPane
-                        pane.viewMode = $0
-                        app.primaryPane = pane
-                    }
-                )) {
-                    Image(systemName: "square.grid.2x2").tag(FileViewMode.grid)
-                    Image(systemName: "list.bullet").tag(FileViewMode.list)
-                    Image(systemName: "rectangle.split.3x1").tag(FileViewMode.columns)
+            },
+            onDualPaneEnabled: { Task { await refreshSecondary() } },
+            onCopyToOtherPane: { Task { await transferBetweenPanes(move: false) } },
+            onMoveToOtherPane: { Task { await transferBetweenPanes(move: true) } },
+            onToggleFavorite: {
+                let url = app.activePane.currentURL
+                if app.isFavorite(url) {
+                    app.removeFavorite(url: url)
+                } else {
+                    _ = app.addFavorite(url)
                 }
-                .pickerStyle(.segmented)
-                .help(L10n.tr("toolbar.view"))
-                .accessibilityLabel(L10n.tr("toolbar.view"))
+            },
+            onSortKey: { key in
+                applyActivePaneSortKey(key)
+            },
+            onToggleSortAscending: {
+                toggleActivePaneSortAscending()
             }
+        )
+    }
 
-            Toggle(isOn: $app.dualPaneEnabled) {
-                Image(systemName: "rectangle.split.2x1")
-            }
-            .toggleStyle(.button)
-            .help(L10n.tr("toolbar.dual_pane"))
-            .accessibilityLabel(L10n.tr("toolbar.dual_pane"))
-            .onChange(of: app.dualPaneEnabled) { _, enabled in
-                if enabled {
-                    Task { await refreshSecondary() }
-                }
-            }
-
-            if app.dualPaneEnabled {
-                Button {
-                    Task { await transferBetweenPanes(move: false) }
-                } label: {
-                    Label(L10n.tr("toolbar.copy_to_other"), systemImage: "doc.on.doc")
-                }
-                .disabled(app.activePane.selectedURLs.isEmpty)
-                .help(L10n.tr("toolbar.copy_to_other"))
-                .accessibilityLabel(L10n.tr("toolbar.copy_to_other"))
-
-                Button {
-                    Task { await transferBetweenPanes(move: true) }
-                } label: {
-                    Label(L10n.tr("toolbar.move_to_other"), systemImage: "arrow.right.doc.on.clipboard")
-                }
-                .disabled(app.activePane.selectedURLs.isEmpty)
-                .help(L10n.tr("toolbar.move_to_other"))
-                .accessibilityLabel(L10n.tr("toolbar.move_to_other"))
-            }
+    private func applyActivePaneSortKey(_ key: FileSortKey) {
+        if app.activePaneID == .secondary, app.dualPaneEnabled {
+            var pane = app.secondaryPane
+            pane.sortKey = key
+            app.secondaryPane = pane
+            Task { await refreshSecondary() }
+        } else {
+            var pane = app.primaryPane
+            pane.sortKey = key
+            app.primaryPane = pane
+            Task { await refreshPrimary() }
         }
+    }
+
+    private func toggleActivePaneSortAscending() {
+        if app.activePaneID == .secondary, app.dualPaneEnabled {
+            var pane = app.secondaryPane
+            pane.sortAscending.toggle()
+            app.secondaryPane = pane
+            Task { await refreshSecondary() }
+        } else {
+            var pane = app.primaryPane
+            pane.sortAscending.toggle()
+            app.primaryPane = pane
+            Task { await refreshPrimary() }
+        }
+    }
+
+    private var tagsPopoverTitle: String {
+        let items = app.activePane.selectedItems
+        if items.count == 1 {
+            return L10n.tr("tags.assign_title %@", items[0].name)
+        }
+        if items.count > 1 {
+            return L10n.tr("tags.assign_title_multiple %lld", items.count)
+        }
+        return L10n.tr("tags.assign_title %@", app.activePane.currentURL.lastPathComponent)
+    }
+
+    private func refreshActivePanes() async {
+        await refreshPrimary()
+        if app.dualPaneEnabled { await refreshSecondary() }
+    }
+
+    private func presentSharePicker() {
+        let urls = selectedURLs()
+        guard !urls.isEmpty else { return }
+        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: \.isVisible),
+              let content = window.contentView else { return }
+        let picker = NSSharingServicePicker(items: urls)
+        // Anchor near the trailing toolbar edge (Finder-like).
+        let anchor = NSRect(
+            x: max(0, content.bounds.maxX - 160),
+            y: max(0, content.bounds.maxY - 8),
+            width: 1,
+            height: 1
+        )
+        picker.show(relativeTo: anchor, of: content, preferredEdge: .minY)
     }
 
     private func openFolderPanel() {
@@ -497,14 +486,10 @@ struct ExplorerRootView: View {
         }
     }
 
-    /// Opens a directory in the current pane, or in a new tab when that preference is on.
+    /// Navigate into a directory in the current pane (Finder-like).
+    /// “Open folders in tabs instead of new windows” only applies when we would open a *new window*,
+    /// not to normal double-click / Open Folder navigation.
     private func openDirectory(_ url: URL, primary: Bool) async {
-        if primary, settings.openFoldersInTabs {
-            app.newTab(url: url)
-            await refreshPrimary()
-            app.recordRecent(url)
-            return
-        }
         await focusDirectory(url, primary: primary, restoring: [])
     }
 
@@ -769,6 +754,28 @@ struct ExplorerRootView: View {
             return true
         }
         return NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
+    }
+
+    @discardableResult
+    private func selectAllFocusedText() -> Bool {
+        guard app.isEditingText || focusedTextView() != nil else { return false }
+        if let textView = focusedTextView() {
+            textView.selectAll(nil)
+            return true
+        }
+        return NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+    }
+
+    private func selectAllFilesInActivePane() {
+        if app.dualPaneEnabled, app.activePaneID == .secondary {
+            var pane = app.secondaryPane
+            pane.selectedURLs = Set(pane.items.map(\.url))
+            app.secondaryPane = pane
+        } else {
+            var pane = app.primaryPane
+            pane.selectedURLs = Set(pane.items.map(\.url))
+            app.primaryPane = pane
+        }
     }
 
     private func focusedTextView() -> NSTextView? {
@@ -1131,7 +1138,7 @@ private struct ExplorerCommandReceiver: ViewModifier {
             .explorerNewTab, .explorerGoBack, .explorerGoForward, .explorerGoUp,
             .explorerRefresh, .explorerOpenFolder, .explorerPathInvalid,
             .explorerNewFolder, .explorerNewFile, .explorerCopy, .explorerCut,
-            .explorerPaste, .explorerDuplicate, .explorerCopyPath, .explorerGetInfo,
+            .explorerPaste, .explorerSelectAll, .explorerDuplicate, .explorerCopyPath, .explorerGetInfo,
             .explorerTrash, .explorerToggleHidden, .explorerToggleDualPane,
             .explorerInstallPlugin, .explorerReloadPlugins, .explorerRevealPlugins,
             .explorerPluginInstallFailed,

@@ -1,9 +1,13 @@
 import SwiftUI
 import AppKit
 
-/// Finder-like file list backed by AppKit `NSTableView` for instant selection highlighting.
+/// Finder-like file list as an outline: rows with disclosure triangles to expand folders in place.
 struct NativeFileTableView: NSViewRepresentable {
     let items: [FileItem]
+    let sortKey: FileSortKey
+    let sortAscending: Bool
+    let keepFoldersOnTop: Bool
+    let includeHiddenFiles: Bool
     @Binding var selection: Set<URL>
     var renameURL: URL?
     @Binding var renameText: String
@@ -23,29 +27,37 @@ struct NativeFileTableView: NSViewRepresentable {
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
-        scroll.drawsBackground = false
+        scroll.drawsBackground = true
+        scroll.backgroundColor = .controlBackgroundColor
 
-        let table = RightClickSelectsTableView()
-        table.style = .plain
-        table.allowsMultipleSelection = true
-        table.allowsEmptySelection = true
-        table.allowsColumnSelection = false
-        table.allowsColumnReordering = true
-        table.usesAlternatingRowBackgroundColors = true
-        table.rowSizeStyle = .small
-        table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.delegate = context.coordinator
-        table.dataSource = context.coordinator
-        table.target = context.coordinator
-        table.doubleAction = #selector(Coordinator.doubleClick(_:))
-        table.headerView = NSTableHeaderView()
+        let outline = RightClickSelectsOutlineView()
+        outline.style = .plain
+        outline.allowsMultipleSelection = true
+        outline.allowsEmptySelection = true
+        outline.allowsColumnSelection = false
+        outline.allowsColumnReordering = true
+        outline.usesAlternatingRowBackgroundColors = true
+        outline.backgroundColor = .controlBackgroundColor
+        outline.rowSizeStyle = .small
+        outline.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        outline.indentationPerLevel = 16
+        outline.indentationMarkerFollowsCell = true
+        outline.autosaveExpandedItems = false
+        outline.delegate = context.coordinator
+        outline.dataSource = context.coordinator
+        outline.target = context.coordinator
+        outline.doubleAction = #selector(Coordinator.doubleClick(_:))
+        outline.headerView = ReadableTableHeaderView(frame: NSRect(x: 0, y: 0, width: 0, height: 24))
 
         for column in Coordinator.makeColumns() {
-            table.addTableColumn(column)
+            outline.addTableColumn(column)
+        }
+        if let name = outline.tableColumns.first {
+            outline.outlineTableColumn = name
         }
 
-        scroll.documentView = table
-        context.coordinator.tableView = table
+        scroll.documentView = outline
+        context.coordinator.outlineView = outline
         context.coordinator.parent = self
         context.coordinator.installMenuIfNeeded()
         context.coordinator.reload(items: items, selection: selection, renameURL: renameURL)
@@ -57,17 +69,19 @@ struct NativeFileTableView: NSViewRepresentable {
         context.coordinator.reload(items: items, selection: selection, renameURL: renameURL)
     }
 
-    final class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource, NSTextFieldDelegate, NSMenuDelegate {
+    @MainActor
+    final class Coordinator: NSObject, NSOutlineViewDelegate, NSOutlineViewDataSource, NSTextFieldDelegate, NSMenuDelegate {
         enum ColumnID: String {
             case name, date, size, kind
         }
 
         var parent: NativeFileTableView
-        weak var tableView: NSTableView?
-        private var items: [FileItem] = []
+        weak var outlineView: NSOutlineView?
+        private var rootNodes: [FileOutlineNode] = []
+        private var expandedURLs: Set<URL> = []
         private var isUpdatingSelection = false
         private var renameField: NSTextField?
-        private var renameRow: Int?
+        private var renameURLActive: URL?
         private var renameFinished = false
 
         private let dateFormatter: DateFormatter = {
@@ -82,94 +96,120 @@ struct NativeFileTableView: NSViewRepresentable {
         }
 
         static func makeColumns() -> [NSTableColumn] {
-            let name = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(ColumnID.name.rawValue))
-            name.title = L10n.tr("column.name")
-            name.minWidth = 180
-            name.width = 280
+            func column(_ id: ColumnID, titleKey: String, minWidth: CGFloat, width: CGFloat) -> NSTableColumn {
+                let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id.rawValue))
+                let title = L10n.tr(titleKey)
+                col.title = title
+                col.headerCell.title = title
+                col.headerCell.textColor = .secondaryLabelColor
+                col.minWidth = minWidth
+                col.width = width
+                return col
+            }
+
+            let name = column(.name, titleKey: "column.name", minWidth: 180, width: 280)
             name.resizingMask = [.autoresizingMask, .userResizingMask]
 
-            let date = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(ColumnID.date.rawValue))
-            date.title = L10n.tr("column.date")
-            date.minWidth = 120
-            date.width = 160
-
-            let size = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(ColumnID.size.rawValue))
-            size.title = L10n.tr("column.size")
-            size.minWidth = 70
-            size.width = 90
-
-            let kind = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(ColumnID.kind.rawValue))
-            kind.title = L10n.tr("column.kind")
-            kind.minWidth = 80
-            kind.width = 120
-
-            return [name, date, size, kind]
+            return [
+                name,
+                column(.date, titleKey: "column.date", minWidth: 120, width: 160),
+                column(.size, titleKey: "column.size", minWidth: 70, width: 90),
+                column(.kind, titleKey: "column.kind", minWidth: 80, width: 120)
+            ]
         }
 
         func reload(items: [FileItem], selection: Set<URL>, renameURL: URL?) {
-            let itemsChanged = itemsDiffer(from: items)
-            self.items = items
-
-            guard let table = tableView else { return }
-
+            let previousExpanded = expandedURLs
+            let itemsChanged = rootItemsDiffer(from: items)
             if itemsChanged {
-                table.reloadData()
+                rootNodes = items.map { FileOutlineNode(item: $0) }
+                outlineView?.reloadData()
+                restoreExpandedState(previousExpanded)
             }
 
             syncSelection(selection)
             syncRename(renameURL: renameURL)
         }
 
-        /// Avoid allocating mapped arrays on every SwiftUI `updateNSView`.
-        private func itemsDiffer(from newItems: [FileItem]) -> Bool {
-            guard items.count == newItems.count else { return true }
-            for index in items.indices {
-                if items[index].url != newItems[index].url || items[index].name != newItems[index].name {
+        private func rootItemsDiffer(from newItems: [FileItem]) -> Bool {
+            guard rootNodes.count == newItems.count else { return true }
+            for index in rootNodes.indices {
+                let old = rootNodes[index].item
+                let new = newItems[index]
+                if old.url != new.url || old.name != new.name || old.tagNames != new.tagNames {
                     return true
                 }
             }
             return false
         }
 
+        private func restoreExpandedState(_ urls: Set<URL>) {
+            guard let outline = outlineView, !urls.isEmpty else { return }
+            func expand(_ nodes: [FileOutlineNode]) {
+                for node in nodes where node.item.isDirectory && urls.contains(node.item.url) {
+                    _ = loadChildrenIfNeeded(for: node)
+                    outline.expandItem(node, expandChildren: false)
+                    if let children = node.children {
+                        expand(children)
+                    }
+                }
+            }
+            expand(rootNodes)
+        }
+
         private func syncSelection(_ selection: Set<URL>) {
-            guard let table = tableView else { return }
+            guard let outline = outlineView else { return }
             isUpdatingSelection = true
             defer { isUpdatingSelection = false }
 
-            let indexes = IndexSet(items.enumerated().compactMap { offset, item in
-                selection.contains(item.url) ? offset : nil
-            })
-            if table.selectedRowIndexes != indexes {
-                table.selectRowIndexes(indexes, byExtendingSelection: false)
+            var indexes = IndexSet()
+            for row in 0..<outline.numberOfRows {
+                if let node = outline.item(atRow: row) as? FileOutlineNode,
+                   selection.contains(node.item.url) {
+                    indexes.insert(row)
+                }
+            }
+            if outline.selectedRowIndexes != indexes {
+                outline.selectRowIndexes(indexes, byExtendingSelection: false)
             }
         }
 
         private func syncRename(renameURL: URL?) {
-            guard let table = tableView else { return }
-            if let renameURL,
-               let row = items.firstIndex(where: { $0.url == renameURL }) {
-                if renameRow != row || renameField == nil {
-                    beginInlineRename(row: row, item: items[row])
+            guard let outline = outlineView else { return }
+            if let renameURL, let node = findNode(url: renameURL) {
+                let row = outline.row(forItem: node)
+                if renameURLActive != renameURL || renameField == nil, row >= 0 {
+                    beginInlineRename(node: node)
                 }
             } else if renameField != nil {
-                let row = renameRow
+                let url = renameURLActive
                 endInlineRename(commit: false, notify: false)
-                if let row, row >= 0, row < items.count {
-                    table.reloadData(forRowIndexes: IndexSet(integer: row), columnIndexes: IndexSet(integer: 0))
+                if let url, let node = findNode(url: url) {
+                    outline.reloadItem(node)
                 }
             }
         }
 
+        private func findNode(url: URL, in nodes: [FileOutlineNode]? = nil) -> FileOutlineNode? {
+            let list = nodes ?? rootNodes
+            for node in list {
+                if node.item.url == url { return node }
+                if let found = findNode(url: url, in: node.children ?? []) {
+                    return found
+                }
+            }
+            return nil
+        }
+
         func installMenuIfNeeded() {
-            guard let table = tableView else { return }
-            if table.menu?.delegate === self { return }
+            guard let outline = outlineView else { return }
+            if outline.menu?.delegate === self { return }
             let menu = NSMenu()
             menu.delegate = self
-            table.menu = menu
+            outline.menu = menu
         }
 
         func menuNeedsUpdate(_ menu: NSMenu) {
-            // Ensure the row under the cursor is selected before building the menu (Finder-like).
             selectRowUnderPendingRightClickIfNeeded()
             menu.removeAllItems()
             let urls = selectedURLs()
@@ -182,58 +222,120 @@ struct NativeFileTableView: NSViewRepresentable {
         }
 
         private func selectRowUnderPendingRightClickIfNeeded() {
-            guard let table = tableView as? RightClickSelectsTableView else { return }
-            table.applyPendingRightClickSelection()
+            guard let outline = outlineView as? RightClickSelectsOutlineView else { return }
+            outline.applyPendingRightClickSelection()
         }
 
         @objc func doubleClick(_ sender: Any?) {
-            guard let table = tableView, table.clickedRow >= 0, table.clickedRow < items.count else { return }
-            parent.onOpen(items[table.clickedRow])
+            guard let outline = outlineView, outline.clickedRow >= 0,
+                  let node = outline.item(atRow: outline.clickedRow) as? FileOutlineNode else { return }
+            parent.onOpen(node.item)
         }
 
-        func numberOfRows(in tableView: NSTableView) -> Int {
-            items.count
+        // MARK: - NSOutlineViewDataSource
+
+        func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+            if item == nil { return rootNodes.count }
+            guard let node = item as? FileOutlineNode else { return 0 }
+            return loadChildrenIfNeeded(for: node).count
         }
 
-        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-            guard row >= 0, row < items.count, let tableColumn else { return nil }
-            let item = items[row]
+        func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+            if item == nil { return rootNodes[index] }
+            let node = item as! FileOutlineNode
+            return loadChildrenIfNeeded(for: node)[index]
+        }
+
+        func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+            (item as? FileOutlineNode)?.item.isDirectory == true
+        }
+
+        @discardableResult
+        private func loadChildrenIfNeeded(for node: FileOutlineNode) -> [FileOutlineNode] {
+            if let children = node.children { return children }
+            var listing = DirectoryListingService(includeHiddenFiles: parent.includeHiddenFiles)
+            do {
+                let items = try listing.listContents(
+                    of: node.item.url,
+                    sortKey: parent.sortKey,
+                    ascending: parent.sortAscending,
+                    keepFoldersOnTop: parent.keepFoldersOnTop
+                )
+                let children = items.map { FileOutlineNode(item: $0, parent: node) }
+                node.children = children
+                return children
+            } catch {
+                node.children = []
+                return []
+            }
+        }
+
+        func outlineViewItemDidExpand(_ notification: Notification) {
+            guard let node = notification.userInfo?["NSObject"] as? FileOutlineNode else { return }
+            expandedURLs.insert(node.item.url)
+            outlineView?.reloadItem(node)
+        }
+
+        func outlineViewItemDidCollapse(_ notification: Notification) {
+            guard let node = notification.userInfo?["NSObject"] as? FileOutlineNode else { return }
+            expandedURLs.remove(node.item.url)
+            // Also drop nested expansions under this node.
+            func removeDescendants(_ n: FileOutlineNode) {
+                for child in n.children ?? [] {
+                    expandedURLs.remove(child.item.url)
+                    removeDescendants(child)
+                }
+            }
+            removeDescendants(node)
+            outlineView?.reloadItem(node)
+        }
+
+        // MARK: - NSOutlineViewDelegate
+
+        func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? {
+            let id = NSUserInterfaceItemIdentifier("AlternatingRow")
+            let rowView = (outlineView.makeView(withIdentifier: id, owner: nil) as? AlternatingTableRowView)
+                ?? AlternatingTableRowView()
+            rowView.identifier = id
+            rowView.rowIndex = outlineView.row(forItem: item)
+            return rowView
+        }
+
+        func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+            guard let node = item as? FileOutlineNode, let tableColumn else { return nil }
+            let file = node.item
             let id = tableColumn.identifier.rawValue
 
             if id == ColumnID.name.rawValue {
-                if renameURLMatches(item), let field = renameField, renameRow == row {
+                if parent.renameURL == file.url, let field = renameField, renameURLActive == file.url {
                     return field
                 }
-                return nameCell(for: item, tableView: tableView)
+                let isOpen = file.isDirectory && outlineView.isItemExpanded(node)
+                return nameCell(for: file, outlineView: outlineView, folderOpen: isOpen)
             }
 
-            let cell = textCell(tableView: tableView, identifier: id)
+            let cell = textCell(outlineView: outlineView, identifier: id)
             cell.textField?.textColor = .secondaryLabelColor
             switch id {
             case ColumnID.date.rawValue:
-                cell.textField?.stringValue = item.contentModificationDate.map { dateFormatter.string(from: $0) } ?? "—"
+                cell.textField?.stringValue = file.contentModificationDate.map { dateFormatter.string(from: $0) } ?? "—"
             case ColumnID.size.rawValue:
-                if let size = item.fileSize, !item.isDirectory {
+                if let size = file.fileSize, !file.isDirectory {
                     cell.textField?.stringValue = ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
                 } else {
                     cell.textField?.stringValue = "—"
                 }
             case ColumnID.kind.rawValue:
-                cell.textField?.stringValue = item.kindLabel
+                cell.textField?.stringValue = file.kindLabel
             default:
                 cell.textField?.stringValue = ""
             }
             return cell
         }
 
-        func tableViewSelectionDidChange(_ notification: Notification) {
-            guard !isUpdatingSelection, let table = tableView else { return }
-            let urls = Set(table.selectedRowIndexes.compactMap { index -> URL? in
-                guard index >= 0, index < items.count else { return nil }
-                return items[index].url
-            })
-            // Highlight is already painted by AppKit. Sync SwiftUI state on the next
-            // turn so we never stall the selection draw on ObservableObject updates.
+        func outlineViewSelectionDidChange(_ notification: Notification) {
+            guard !isUpdatingSelection, let outline = outlineView else { return }
+            let urls = selectedURLs()
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.parent.selection != urls else { return }
                 self.parent.selection = urls
@@ -241,60 +343,31 @@ struct NativeFileTableView: NSViewRepresentable {
         }
 
         private func selectedURLs() -> Set<URL> {
-            guard let table = tableView else { return [] }
-            return Set(table.selectedRowIndexes.compactMap { index -> URL? in
-                guard index >= 0, index < items.count else { return nil }
-                return items[index].url
+            guard let outline = outlineView else { return [] }
+            return Set(outline.selectedRowIndexes.compactMap { row -> URL? in
+                (outline.item(atRow: row) as? FileOutlineNode)?.item.url
             })
         }
 
-        private func renameURLMatches(_ item: FileItem) -> Bool {
-            parent.renameURL == item.url
-        }
-
-        private func nameCell(for item: FileItem, tableView: NSTableView) -> NSTableCellView {
+        private func nameCell(for item: FileItem, outlineView: NSOutlineView, folderOpen: Bool) -> NSTableCellView {
             let identifier = NSUserInterfaceItemIdentifier("NameCell")
-            let cell = (tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTableCellView) ?? {
-                let cell = NSTableCellView()
+            let cell = (outlineView.makeView(withIdentifier: identifier, owner: nil) as? NameTagCellView) ?? {
+                let cell = NameTagCellView()
                 cell.identifier = identifier
-
-                let imageView = NSImageView()
-                imageView.translatesAutoresizingMaskIntoConstraints = false
-                imageView.imageScaling = .scaleProportionallyDown
-
-                let text = NSTextField(labelWithString: "")
-                text.translatesAutoresizingMaskIntoConstraints = false
-                text.lineBreakMode = .byTruncatingTail
-                text.isEditable = false
-                text.isBordered = false
-                text.drawsBackground = false
-
-                cell.addSubview(imageView)
-                cell.addSubview(text)
-                cell.imageView = imageView
-                cell.textField = text
-
-                NSLayoutConstraint.activate([
-                    imageView.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
-                    imageView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                    imageView.widthAnchor.constraint(equalToConstant: 16),
-                    imageView.heightAnchor.constraint(equalToConstant: 16),
-                    text.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 6),
-                    text.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
-                    text.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
-                ])
                 return cell
             }()
 
-            cell.imageView?.image = FileIconCache.icon(for: item.url, size: 16)
-            cell.textField?.stringValue = item.listedName(showExtension: parent.showFilenameExtensions)
-            cell.textField?.isHidden = false
+            cell.configure(
+                icon: FileIconCache.icon(for: item, size: 16, folderOpen: folderOpen),
+                name: item.listedName(showExtension: parent.showFilenameExtensions),
+                tagColors: item.finderColorTags
+            )
             return cell
         }
 
-        private func textCell(tableView: NSTableView, identifier: String) -> NSTableCellView {
+        private func textCell(outlineView: NSOutlineView, identifier: String) -> NSTableCellView {
             let id = NSUserInterfaceItemIdentifier(identifier)
-            let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? NSTableCellView) ?? {
+            let cell = (outlineView.makeView(withIdentifier: id, owner: nil) as? NSTableCellView) ?? {
                 let cell = NSTableCellView()
                 cell.identifier = id
                 let text = NSTextField(labelWithString: "")
@@ -315,10 +388,11 @@ struct NativeFileTableView: NSViewRepresentable {
             return cell
         }
 
-        private func beginInlineRename(row: Int, item: FileItem) {
-            guard let table = tableView else { return }
+        private func beginInlineRename(node: FileOutlineNode) {
+            guard let outline = outlineView else { return }
             endInlineRename(commit: false, notify: false)
 
+            let item = node.item
             let field = NSTextField(string: parent.renameText.isEmpty ? item.name : parent.renameText)
             field.isBordered = true
             field.isBezeled = true
@@ -329,14 +403,14 @@ struct NativeFileTableView: NSViewRepresentable {
             field.cell?.sendsActionOnEndEditing = false
 
             renameField = field
-            renameRow = row
+            renameURLActive = item.url
             renameFinished = false
             parent.renameText = field.stringValue
 
-            table.reloadData(forRowIndexes: IndexSet(integer: row), columnIndexes: IndexSet(integer: 0))
+            outline.reloadItem(node)
 
             DispatchQueue.main.async {
-                table.window?.makeFirstResponder(field)
+                outline.window?.makeFirstResponder(field)
                 let range = RenameSelection.selectedRange(for: field.stringValue, isDirectory: item.isDirectory)
                 field.currentEditor()?.selectedRange = range
             }
@@ -346,8 +420,8 @@ struct NativeFileTableView: NSViewRepresentable {
             guard renameField != nil else { return }
             let field = renameField
             renameField = nil
-            let row = renameRow
-            renameRow = nil
+            let url = renameURLActive
+            renameURLActive = nil
             if let field {
                 parent.renameText = field.stringValue
             }
@@ -358,8 +432,8 @@ struct NativeFileTableView: NSViewRepresentable {
                     parent.onCancelRename()
                 }
             }
-            if let table = tableView, let row, row >= 0, row < items.count {
-                table.reloadData(forRowIndexes: IndexSet(integer: row), columnIndexes: IndexSet(integer: 0))
+            if let outline = outlineView, let url, let node = findNode(url: url) {
+                outline.reloadItem(node)
             }
             _ = field
         }
@@ -392,8 +466,144 @@ struct NativeFileTableView: NSViewRepresentable {
     }
 }
 
-/// Selects the clicked row on right-click (unless it is already part of the selection).
-private final class RightClickSelectsTableView: NSTableView {
+/// Tree node for the list outline (lazy-loaded children).
+@MainActor
+private final class FileOutlineNode: NSObject {
+    let item: FileItem
+    weak var parent: FileOutlineNode?
+    var children: [FileOutlineNode]?
+
+    init(item: FileItem, parent: FileOutlineNode? = nil) {
+        self.item = item
+        self.parent = parent
+    }
+}
+
+/// Explicit zebra rows — system alternating colors are easy to lose inside a SwiftUI-hosted scroll view.
+@MainActor
+private final class AlternatingTableRowView: NSTableRowView {
+    var rowIndex: Int = 0
+
+    override func drawBackground(in dirtyRect: NSRect) {
+        if isSelected {
+            super.drawBackground(in: dirtyRect)
+            return
+        }
+        let pair = NSColor.alternatingContentBackgroundColors
+        let fill = pair.indices.contains(rowIndex % 2) ? pair[rowIndex % 2] : .controlBackgroundColor
+        fill.setFill()
+        bounds.fill()
+    }
+}
+
+/// Table header with readable label contrast (Tahoe glass defaults are near-invisible).
+@MainActor
+private final class ReadableTableHeaderView: NSTableHeaderView {
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: 26)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let bounds = self.bounds
+        NSColor.controlBackgroundColor.setFill()
+        bounds.fill()
+
+        guard let table = tableView else { return }
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold),
+            .foregroundColor: NSColor.secondaryLabelColor
+        ]
+        var x = CGFloat(0)
+        for column in table.tableColumns where !column.isHidden {
+            let width = column.width
+            let title = column.headerCell.stringValue as NSString
+            let size = title.size(withAttributes: attrs)
+            let point = NSPoint(
+                x: x + 8,
+                y: (bounds.height - size.height) / 2
+            )
+            title.draw(at: point, withAttributes: attrs)
+            x += width
+        }
+
+        NSColor.separatorColor.withAlphaComponent(0.55).setStroke()
+        let bottom = NSBezierPath()
+        bottom.move(to: NSPoint(x: bounds.minX, y: bounds.minY + 0.5))
+        bottom.line(to: NSPoint(x: bounds.maxX, y: bounds.minY + 0.5))
+        bottom.lineWidth = 1
+        bottom.stroke()
+    }
+}
+
+/// Name column cell: icon + label + Finder tag dots (same palette as Finder).
+@MainActor
+private final class NameTagCellView: NSTableCellView {
+    private let dotsView = FinderTagDotsStackView()
+    private var textTrailingToDots: NSLayoutConstraint?
+    private var textTrailingToEdge: NSLayoutConstraint?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setup()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    func configure(icon: NSImage, name: String, tagColors: [FinderColorTag]) {
+        imageView?.image = icon
+        textField?.stringValue = name
+        textField?.isHidden = false
+        dotsView.setColors(tagColors)
+        dotsView.isHidden = tagColors.isEmpty
+        textTrailingToDots?.isActive = !tagColors.isEmpty
+        textTrailingToEdge?.isActive = tagColors.isEmpty
+    }
+
+    private func setup() {
+        let imageView = NSImageView()
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.imageScaling = .scaleProportionallyDown
+
+        let text = NSTextField(labelWithString: "")
+        text.translatesAutoresizingMaskIntoConstraints = false
+        text.lineBreakMode = .byTruncatingTail
+        text.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        text.isEditable = false
+        text.isBordered = false
+        text.drawsBackground = false
+
+        dotsView.translatesAutoresizingMaskIntoConstraints = false
+        dotsView.setContentHuggingPriority(.required, for: .horizontal)
+
+        addSubview(imageView)
+        addSubview(text)
+        addSubview(dotsView)
+        self.imageView = imageView
+        self.textField = text
+
+        let toDots = text.trailingAnchor.constraint(lessThanOrEqualTo: dotsView.leadingAnchor, constant: -6)
+        let toEdge = text.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4)
+        textTrailingToDots = toDots
+        textTrailingToEdge = toEdge
+
+        NSLayoutConstraint.activate([
+            imageView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
+            imageView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            imageView.widthAnchor.constraint(equalToConstant: 16),
+            imageView.heightAnchor.constraint(equalToConstant: 16),
+            text.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 6),
+            text.centerYAnchor.constraint(equalTo: centerYAnchor),
+            toEdge,
+            dotsView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            dotsView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            dotsView.heightAnchor.constraint(equalToConstant: 10)
+        ])
+    }
+}
+
+@MainActor
+private final class RightClickSelectsOutlineView: NSOutlineView {
     private var pendingRightClickRow: Int?
 
     override func rightMouseDown(with event: NSEvent) {
@@ -415,12 +625,10 @@ private final class RightClickSelectsTableView: NSTableView {
         guard let row = pendingRightClickRow else { return }
         pendingRightClickRow = nil
         if row >= 0 {
-            // Finder: unselected row → select only that row; already selected → keep multi-selection.
             if !selectedRowIndexes.contains(row) {
                 selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
             }
         } else {
-            // Empty area: clear selection so the background menu applies.
             deselectAll(nil)
         }
     }

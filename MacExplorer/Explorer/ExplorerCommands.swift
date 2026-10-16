@@ -67,6 +67,11 @@ struct ExplorerCommands: Commands {
                 NotificationCenter.default.post(name: .explorerCopyPath, object: nil)
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
+
+            Button(L10n.tr("action.select_all")) {
+                NotificationCenter.default.post(name: .explorerSelectAll, object: nil)
+            }
+            .keyboardShortcut("a", modifiers: [.command])
         }
 
         CommandMenu(L10n.tr("menu.go")) {
@@ -169,6 +174,7 @@ extension Notification.Name {
     static let explorerFolderActionsSetup = Notification.Name("explorerFolderActionsSetup")
     static let explorerShowViewOptions = Notification.Name("explorerShowViewOptions")
     static let explorerOpenSettings = Notification.Name("explorerOpenSettings")
+    static let explorerSelectAll = Notification.Name("explorerSelectAll")
 }
 
 /// Items whose placement is `.actionsMenu` in Settings.

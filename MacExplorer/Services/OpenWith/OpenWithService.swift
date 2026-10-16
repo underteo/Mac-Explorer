@@ -7,7 +7,8 @@ struct OpenWithApp: Identifiable, Hashable, Sendable {
     let name: String
 }
 
-struct OpenWithService: Sendable {
+@MainActor
+struct OpenWithService {
     func applications(for fileURL: URL) -> [OpenWithApp] {
         let urls = NSWorkspace.shared.urlsForApplications(toOpen: fileURL)
         return urls.map { url in

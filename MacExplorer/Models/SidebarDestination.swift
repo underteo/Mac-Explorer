@@ -4,6 +4,7 @@ import Foundation
 enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
     case recents
     case favorites
+    case macintoshHD
     case applications
     case desktop
     case documents
@@ -20,6 +21,12 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .recents: return L10n.tr("sidebar.section.recents")
         case .favorites: return L10n.tr("sidebar.section.favorites")
+        case .macintoshHD:
+            // Prefer the live boot volume name (Finder-like), else fallback string.
+            if let name = Self.bootVolumeName(), !name.isEmpty {
+                return name
+            }
+            return L10n.tr("sidebar.macintoshHD")
         default: return L10n.tr("sidebar.\(rawValue)")
         }
     }
@@ -28,6 +35,7 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .recents: return "clock"
         case .favorites: return "star"
+        case .macintoshHD: return "internaldrive"
         case .applications: return "app"
         case .desktop: return "desktopcomputer"
         case .documents: return "doc"
@@ -45,7 +53,7 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .favorites: return .favorites
         case .recents: return .recents
-        case .applications, .desktop, .documents, .downloads,
+        case .macintoshHD, .applications, .desktop, .documents, .downloads,
              .movies, .music, .pictures, .home, .trash:
             return .locations
         }
@@ -64,6 +72,8 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .recents, .favorites:
             return nil
+        case .macintoshHD:
+            return URL(fileURLWithPath: "/", isDirectory: true)
         case .home:
             return home
         case .desktop:
@@ -83,6 +93,11 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
         case .trash:
             return home.appendingPathComponent(".Trash", isDirectory: true)
         }
+    }
+
+    private static func bootVolumeName() -> String? {
+        let root = URL(fileURLWithPath: "/", isDirectory: true)
+        return try? root.resourceValues(forKeys: [.volumeNameKey]).volumeName
     }
 }
 
