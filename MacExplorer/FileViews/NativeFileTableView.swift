@@ -15,6 +15,8 @@ struct NativeFileTableView: NSViewRepresentable {
     var onOpen: (FileItem) -> Void
     var onCommitRename: () -> Void
     var onCancelRename: () -> Void
+    /// Header click: new key (and ascending) or toggle direction on the same key.
+    var onSortChange: (FileSortKey, Bool) -> Void
     var makeContextMenu: (Set<URL>) -> NSMenu
 
     func makeCoordinator() -> Coordinator {
@@ -47,7 +49,12 @@ struct NativeFileTableView: NSViewRepresentable {
         outline.dataSource = context.coordinator
         outline.target = context.coordinator
         outline.doubleAction = #selector(Coordinator.doubleClick(_:))
-        outline.headerView = ReadableTableHeaderView(frame: NSRect(x: 0, y: 0, width: 0, height: 24))
+
+        let header = SortableTableHeaderView(frame: NSRect(x: 0, y: 0, width: 0, height: 26))
+        header.onSortColumn = { [weak coordinator = context.coordinator] columnID in
+            coordinator?.handleHeaderSort(columnID: columnID)
+        }
+        outline.headerView = header
 
         for column in Coordinator.makeColumns() {
             outline.addTableColumn(column)
@@ -61,12 +68,14 @@ struct NativeFileTableView: NSViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.installMenuIfNeeded()
         context.coordinator.reload(items: items, selection: selection, renameURL: renameURL)
+        context.coordinator.syncHeaderSortIndicators()
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.reload(items: items, selection: selection, renameURL: renameURL)
+        context.coordinator.syncHeaderSortIndicators()
     }
 
     @MainActor
@@ -116,6 +125,34 @@ struct NativeFileTableView: NSViewRepresentable {
                 column(.size, titleKey: "column.size", minWidth: 70, width: 90),
                 column(.kind, titleKey: "column.kind", minWidth: 80, width: 120)
             ]
+        }
+
+        static func sortKey(forColumnID id: String) -> FileSortKey? {
+            switch id {
+            case ColumnID.name.rawValue: return .name
+            case ColumnID.date.rawValue: return .date
+            case ColumnID.size.rawValue: return .size
+            case ColumnID.kind.rawValue: return .kind
+            default: return nil
+            }
+        }
+
+        func handleHeaderSort(columnID: String) {
+            guard let key = Self.sortKey(forColumnID: columnID) else { return }
+            if parent.sortKey == key {
+                parent.onSortChange(key, !parent.sortAscending)
+            } else {
+                // Finder-like defaults: name/kind A→Z; date/size newest/largest first.
+                let ascending = (key == .name || key == .kind)
+                parent.onSortChange(key, ascending)
+            }
+        }
+
+        func syncHeaderSortIndicators() {
+            guard let header = outlineView?.headerView as? SortableTableHeaderView else { return }
+            header.sortKey = parent.sortKey
+            header.sortAscending = parent.sortAscending
+            header.needsDisplay = true
         }
 
         func reload(items: [FileItem], selection: Set<URL>, renameURL: URL?) {
@@ -496,15 +533,18 @@ private final class AlternatingTableRowView: NSTableRowView {
     }
 }
 
-/// Table header with readable label contrast (Tahoe glass defaults are near-invisible).
+/// Readable headers aligned to real column rects; click sorts like Finder.
 @MainActor
-private final class ReadableTableHeaderView: NSTableHeaderView {
+private final class SortableTableHeaderView: NSTableHeaderView {
+    var sortKey: FileSortKey = .name
+    var sortAscending: Bool = true
+    var onSortColumn: ((String) -> Void)?
+
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: 26)
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let bounds = self.bounds
         NSColor.controlBackgroundColor.setFill()
         bounds.fill()
 
@@ -513,17 +553,50 @@ private final class ReadableTableHeaderView: NSTableHeaderView {
             .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold),
             .foregroundColor: NSColor.secondaryLabelColor
         ]
-        var x = CGFloat(0)
-        for column in table.tableColumns where !column.isHidden {
-            let width = column.width
+        let indicatorAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 9, weight: .bold),
+            .foregroundColor: NSColor.tertiaryLabelColor
+        ]
+
+        for (index, column) in table.tableColumns.enumerated() where !column.isHidden {
+            let rect = headerRect(ofColumn: index)
+            guard rect.intersects(dirtyRect) else { continue }
+
             let title = column.headerCell.stringValue as NSString
-            let size = title.size(withAttributes: attrs)
+            let titleSize = title.size(withAttributes: attrs)
+            let padding: CGFloat = 8
+            var textX = rect.minX + padding
+
+            // Name column content sits after disclosure + icon; nudge header to match.
+            if column.identifier.rawValue == "name" {
+                textX += 22
+            }
+
             let point = NSPoint(
-                x: x + 8,
-                y: (bounds.height - size.height) / 2
+                x: textX,
+                y: rect.minY + (rect.height - titleSize.height) / 2
             )
             title.draw(at: point, withAttributes: attrs)
-            x += width
+
+            if let key = NativeFileTableView.Coordinator.sortKey(forColumnID: column.identifier.rawValue),
+               key == sortKey {
+                let arrow = (sortAscending ? "▲" : "▼") as NSString
+                let arrowSize = arrow.size(withAttributes: indicatorAttrs)
+                let arrowPoint = NSPoint(
+                    x: point.x + titleSize.width + 4,
+                    y: rect.minY + (rect.height - arrowSize.height) / 2
+                )
+                arrow.draw(at: arrowPoint, withAttributes: indicatorAttrs)
+            }
+
+            if index < table.tableColumns.count - 1 {
+                NSColor.separatorColor.withAlphaComponent(0.35).setStroke()
+                let divider = NSBezierPath()
+                divider.move(to: NSPoint(x: rect.maxX - 0.5, y: rect.minY + 4))
+                divider.line(to: NSPoint(x: rect.maxX - 0.5, y: rect.maxY - 4))
+                divider.lineWidth = 1
+                divider.stroke()
+            }
         }
 
         NSColor.separatorColor.withAlphaComponent(0.55).setStroke()
@@ -532,6 +605,18 @@ private final class ReadableTableHeaderView: NSTableHeaderView {
         bottom.line(to: NSPoint(x: bounds.maxX, y: bounds.minY + 0.5))
         bottom.lineWidth = 1
         bottom.stroke()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let local = convert(event.locationInWindow, from: nil)
+        let columnIndex = column(at: local)
+        guard columnIndex >= 0, let table = tableView,
+              table.tableColumns.indices.contains(columnIndex) else {
+            super.mouseDown(with: event)
+            return
+        }
+        let column = table.tableColumns[columnIndex]
+        onSortColumn?(column.identifier.rawValue)
     }
 }
 

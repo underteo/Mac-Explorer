@@ -198,6 +198,11 @@ struct PaneBrowserView: View {
                 sortKey: pane.sortKey,
                 sortAscending: pane.sortAscending,
                 onOpen: onOpen,
+                onSortChange: { key, ascending in
+                    pane.sortKey = key
+                    pane.sortAscending = ascending
+                    onRefresh()
+                },
                 renameURL: renameURL,
                 renameText: $renameText,
                 onCommitRename: onCommitRename,

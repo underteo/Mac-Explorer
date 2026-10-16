@@ -11,6 +11,7 @@ struct FileListView: View {
     var sortKey: FileSortKey = .name
     var sortAscending: Bool = true
     let onOpen: (FileItem) -> Void
+    var onSortChange: (FileSortKey, Bool) -> Void = { _, _ in }
     var renameURL: URL?
     @Binding var renameText: String
     var onCommitRename: () -> Void
@@ -31,6 +32,7 @@ struct FileListView: View {
             onOpen: onOpen,
             onCommitRename: onCommitRename,
             onCancelRename: onCancelRename,
+            onSortChange: onSortChange,
             makeContextMenu: { urls in
                 FileTableNSMenuFactory.make(
                     urls: urls,
