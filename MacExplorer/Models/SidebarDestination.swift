@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// Built-in sidebar destinations the user can show/hide in Settings.
@@ -48,6 +49,16 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// AppKit system `NSImage` name when Finder ships dedicated artwork (else `nil` → URL / SF Symbol).
+    var systemNSImageName: String? {
+        switch self {
+        case .trash: return NSImage.trashEmptyName
+        case .macintoshHD: return NSImage.computerName
+        case .home: return NSImage.homeTemplateName
+        default: return nil
+        }
+    }
+
     /// Grouping used in Settings → Sidebar and sidebar section headers.
     var settingsSection: SidebarSettingsSection {
         switch self {
@@ -91,7 +102,7 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
         case .applications:
             return URL(fileURLWithPath: "/Applications", isDirectory: true)
         case .trash:
-            return home.appendingPathComponent(".Trash", isDirectory: true)
+            return FullDiskAccess.trashDirectoryURL
         }
     }
 

@@ -55,6 +55,9 @@
 "state.empty.title" = "Cartella vuota";
 "state.empty.message" = "Questa cartella non contiene elementi da mostrare.";
 "state.error.title" = "Impossibile aprire";
+"error.trash_needs_fda.title" = "Permesso richiesto";
+"error.trash_needs_fda" = "Il Cestino (~/.Trash) è protetto da macOS: senza Accesso disco completo un’app di terze parti non può aprirlo.\n\n1. Tocca il pulsante qui sotto (Impostazioni → Privacy e sicurezza → Accesso disco completo)\n2. Aggiungi “Mac Explorer.app” da /Applications e attivalo\n3. Torna qui e tocca Aggiorna";
+"error.trash_needs_fda_derived" = "Stai aprendo una build da Xcode/DerivedData: concedi il permesso a /Applications/Mac Explorer.app e aprilo da lì.";
 
 /* Actions */
 "action.open" = "Apri";

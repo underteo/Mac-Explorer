@@ -75,9 +75,7 @@ struct FileItem: Identifiable, Hashable, Sendable {
     }
 
     static func isTrashURL(_ url: URL) -> Bool {
-        let trash = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".Trash", isDirectory: true)
-            .standardizedFileURL
+        let trash = FullDiskAccess.trashDirectoryURL
         return url.standardizedFileURL == trash
             || url.standardizedFileURL.path.hasPrefix(trash.path + "/")
     }

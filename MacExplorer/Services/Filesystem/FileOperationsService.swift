@@ -72,8 +72,7 @@ struct FileOperationsService: @unchecked Sendable {
     }
 
     func emptyTrash() throws {
-        let trash = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent(".Trash", isDirectory: true)
+        let trash = FullDiskAccess.trashDirectoryURL
         let contents = try fileManager.contentsOfDirectory(
             at: trash,
             includingPropertiesForKeys: nil,

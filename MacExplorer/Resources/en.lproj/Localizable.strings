@@ -55,6 +55,9 @@
 "state.empty.title" = "Empty Folder";
 "state.empty.message" = "This folder has no items to show.";
 "state.error.title" = "Unable to Open";
+"error.trash_needs_fda.title" = "Permission Needed";
+"error.trash_needs_fda" = "The Trash (~/.Trash) is protected by macOS — without Full Disk Access a third-party app can’t open it.\n\n1. Tap the button below (System Settings → Privacy & Security → Full Disk Access)\n2. Add “Mac Explorer.app” from /Applications and turn it on\n3. Come back here and tap Refresh";
+"error.trash_needs_fda_derived" = "You’re running an Xcode/DerivedData build: grant access to /Applications/Mac Explorer.app and open that copy.";
 
 /* Actions */
 "action.open" = "Open";

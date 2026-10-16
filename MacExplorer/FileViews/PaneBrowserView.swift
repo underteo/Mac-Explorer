@@ -133,12 +133,29 @@ struct PaneBrowserView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = pane.errorMessage, pane.viewMode != .columns || pane.items.isEmpty {
+            let needsTrashFDA = FileItem.isTrashURL(pane.currentURL)
+            let trashMessage: String = {
+                var text = L10n.tr("error.trash_needs_fda")
+                if FullDiskAccess.isRunningFromDerivedData {
+                    text += "\n\n" + L10n.tr("error.trash_needs_fda_derived")
+                }
+                return text
+            }()
             ExplorerEmptyState(
-                title: L10n.tr("state.error.title"),
-                systemImage: "exclamationmark.triangle",
-                message: error,
-                actionTitle: L10n.tr("toolbar.refresh"),
-                action: onRefresh
+                title: needsTrashFDA
+                    ? L10n.tr("error.trash_needs_fda.title")
+                    : L10n.tr("state.error.title"),
+                systemImage: needsTrashFDA ? "trash.slash" : "exclamationmark.triangle",
+                message: needsTrashFDA ? trashMessage : error,
+                actionTitle: needsTrashFDA
+                    ? L10n.tr("settings.privacy.open_fda")
+                    : L10n.tr("toolbar.refresh"),
+                action: needsTrashFDA
+                    ? { FullDiskAccess.openSystemSettings() }
+                    : onRefresh,
+                actionProminent: needsTrashFDA,
+                secondaryActionTitle: needsTrashFDA ? L10n.tr("toolbar.refresh") : nil,
+                secondaryAction: needsTrashFDA ? onRefresh : nil
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contextMenu { backgroundMenu }

@@ -92,10 +92,10 @@ struct SidebarView: View {
                 navigate(to: url)
             }
         } label: {
-            if let url = destination.resolveURL() {
-                SidebarIconLabel(title: destination.localizedTitle, url: url)
-            } else {
-                Label(destination.localizedTitle, systemImage: destination.systemImage)
+            Label {
+                Text(destination.localizedTitle)
+            } icon: {
+                SidebarSystemIcon(image: FileIconCache.sidebarIcon(for: destination, size: 16))
             }
         }
         .buttonStyle(.plain)
@@ -128,10 +128,19 @@ private struct SidebarIconLabel: View {
         Label {
             Text(title)
         } icon: {
-            Image(nsImage: FileIconCache.systemIcon(for: url, size: 16))
-                .resizable()
-                .frame(width: 16, height: 16)
+            SidebarSystemIcon(image: FileIconCache.systemIcon(for: url, size: 16))
         }
+    }
+}
+
+private struct SidebarSystemIcon: View {
+    let image: NSImage
+
+    var body: some View {
+        Image(nsImage: image)
+            .resizable()
+            .renderingMode(image.isTemplate ? .template : .original)
+            .frame(width: 16, height: 16)
     }
 }
 
