@@ -35,26 +35,34 @@ struct SidebarSettingsView: View {
     @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
-        Form {
+        VStack(alignment: .leading, spacing: 8) {
             Text(L10n.tr("settings.sidebar.header"))
                 .foregroundStyle(.secondary)
                 .font(.callout)
 
-            ForEach(SidebarSettingsSection.allCases) { section in
-                Section {
-                    ForEach(section.items) { item in
-                        Toggle(isOn: settings.bindingSidebarItem(item)) {
-                            Label(item.localizedTitle, systemImage: item.systemImage)
-                        }
-                    }
-                } header: {
-                    if let title = section.title {
-                        Text(title)
+            Text(L10n.tr("settings.sidebar.reorder_hint"))
+                .foregroundStyle(.secondary)
+                .font(.caption)
+
+            List {
+                ForEach(settings.orderedSidebarDestinations) { item in
+                    Toggle(isOn: settings.bindingSidebarItem(item)) {
+                        Label(item.localizedTitle, systemImage: item.systemImage)
                     }
                 }
+                .onMove(perform: settings.moveSidebarItem)
+            }
+            .listStyle(.inset(alternatesRowBackgrounds: true))
+
+            HStack {
+                Spacer()
+                Button(L10n.tr("settings.sidebar.reset_order")) {
+                    settings.resetSidebarOrder()
+                }
+                .buttonStyle(.borderless)
             }
         }
-        .formStyle(.grouped)
+        .padding(.top, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

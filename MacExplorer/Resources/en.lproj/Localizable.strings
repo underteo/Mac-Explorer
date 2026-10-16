@@ -98,7 +98,9 @@
 /* Settings */
 "settings.general" = "General";
 "settings.sidebar" = "Sidebar";
-"settings.sidebar.header" = "Show these items in the sidebar:";
+"settings.sidebar.header" = "Show and reorder sidebar items:";
+"settings.sidebar.reorder_hint" = "Drag rows to change the order in the sidebar.";
+"settings.sidebar.reset_order" = "Reset Order";
 "settings.plugins" = "Plugins";
 "settings.new_window_shows" = "New windows show:";
 "settings.open_folders_in_tabs" = "Open folders in tabs instead of new windows";

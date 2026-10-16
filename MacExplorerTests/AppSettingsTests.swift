@@ -70,4 +70,22 @@ final class AppSettingsTests: XCTestCase {
         let restored = AppSettings(defaults: defaults)
         XCTAssertTrue(restored.isSidebarItemVisible(.movies))
     }
+
+    func testSidebarOrderMoveAndPersist() {
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.orderedSidebarDestinations.first, .favorites)
+        XCTAssertEqual(settings.orderedSidebarDestinations.last, .recents)
+
+        // Move Recents to the top.
+        let from = IndexSet(integer: settings.orderedSidebarDestinations.count - 1)
+        settings.moveSidebarItem(from: from, to: 0)
+        XCTAssertEqual(settings.orderedSidebarDestinations.first, .recents)
+
+        let restored = AppSettings(defaults: defaults)
+        XCTAssertEqual(restored.orderedSidebarDestinations.first, .recents)
+
+        settings.resetSidebarOrder()
+        XCTAssertEqual(settings.orderedSidebarDestinations.first, .favorites)
+        XCTAssertEqual(settings.orderedSidebarDestinations.last, .recents)
+    }
 }

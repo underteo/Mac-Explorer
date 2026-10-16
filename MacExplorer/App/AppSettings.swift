@@ -71,6 +71,7 @@ final class AppSettings: ObservableObject {
         static let newWindow = "settings.newWindowLocation"
         static let openInTabs = "settings.openFoldersInTabs"
         static let sidebarVisible = "settings.sidebarVisibleItems"
+        static let sidebarOrder = "settings.sidebarOrder"
     }
 
     /// Default sidebar visibility (Finder-like: media folders off, core locations on).
@@ -84,6 +85,21 @@ final class AppSettings: ObservableObject {
         SidebarDestination.home.rawValue,
         SidebarDestination.trash.rawValue
     ])
+
+    /// Default order: Favorites → locations → Recents.
+    static let defaultSidebarOrder: [String] = [
+        SidebarDestination.favorites.rawValue,
+        SidebarDestination.applications.rawValue,
+        SidebarDestination.desktop.rawValue,
+        SidebarDestination.documents.rawValue,
+        SidebarDestination.downloads.rawValue,
+        SidebarDestination.movies.rawValue,
+        SidebarDestination.music.rawValue,
+        SidebarDestination.pictures.rawValue,
+        SidebarDestination.home.rawValue,
+        SidebarDestination.trash.rawValue,
+        SidebarDestination.recents.rawValue
+    ]
 
     private let defaults: UserDefaults
 
@@ -117,6 +133,13 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Ordered sidebar destinations (favorites / locations / recents).
+    @Published var sidebarOrder: [String] {
+        didSet {
+            defaults.set(sidebarOrder, forKey: Keys.sidebarOrder)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -140,6 +163,22 @@ final class AppSettings: ObservableObject {
         } else {
             self.sidebarVisibleItems = Self.defaultSidebarVisible
         }
+
+        if let savedOrder = defaults.array(forKey: Keys.sidebarOrder) as? [String], !savedOrder.isEmpty {
+            self.sidebarOrder = Self.normalizedSidebarOrder(savedOrder)
+        } else {
+            self.sidebarOrder = Self.defaultSidebarOrder
+        }
+    }
+
+    /// All destinations in user order, appending any newly added ones at the end.
+    var orderedSidebarDestinations: [SidebarDestination] {
+        Self.normalizedSidebarOrder(sidebarOrder).compactMap { SidebarDestination(rawValue: $0) }
+    }
+
+    /// Visible destinations in sidebar order.
+    var orderedVisibleSidebarDestinations: [SidebarDestination] {
+        orderedSidebarDestinations.filter { isSidebarItemVisible($0) }
     }
 
     func isSidebarItemVisible(_ item: SidebarDestination) -> Bool {
@@ -159,6 +198,30 @@ final class AppSettings: ObservableObject {
             get: { self.isSidebarItemVisible(item) },
             set: { self.setSidebarItem(item, visible: $0) }
         )
+    }
+
+    func moveSidebarItem(from source: IndexSet, to destination: Int) {
+        var order = orderedSidebarDestinations.map(\.rawValue)
+        order.move(fromOffsets: source, toOffset: destination)
+        sidebarOrder = order
+    }
+
+    func resetSidebarOrder() {
+        sidebarOrder = Self.defaultSidebarOrder
+    }
+
+    static func normalizedSidebarOrder(_ order: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for raw in order {
+            guard SidebarDestination(rawValue: raw) != nil, !seen.contains(raw) else { continue }
+            seen.insert(raw)
+            result.append(raw)
+        }
+        for destination in SidebarDestination.allCases where !seen.contains(destination.rawValue) {
+            result.append(destination.rawValue)
+        }
+        return result
     }
 
     static func clampZoom(_ value: Double) -> Double {
