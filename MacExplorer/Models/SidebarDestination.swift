@@ -40,14 +40,13 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Grouping used in Settings → Sidebar (Finder-like).
+    /// Grouping used in Settings → Sidebar and sidebar section headers.
     var settingsSection: SidebarSettingsSection {
         switch self {
-        case .recents:
-            return .top
-        case .favorites, .applications, .desktop, .documents, .downloads, .movies, .music, .pictures:
-            return .favorites
-        case .home, .trash:
+        case .favorites: return .favorites
+        case .recents: return .recents
+        case .applications, .desktop, .documents, .downloads,
+             .movies, .music, .pictures, .home, .trash:
             return .locations
         }
     }
@@ -88,21 +87,62 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
 }
 
 enum SidebarSettingsSection: String, CaseIterable, Identifiable {
-    case top
     case favorites
     case locations
+    case recents
 
     var id: String { rawValue }
 
-    var title: String? {
+    var title: String {
         switch self {
-        case .top: return nil
         case .favorites: return L10n.tr("sidebar.section.favorites")
         case .locations: return L10n.tr("sidebar.section.locations")
+        case .recents: return L10n.tr("sidebar.section.recents")
         }
     }
 
     var items: [SidebarDestination] {
         SidebarDestination.allCases.filter { $0.settingsSection == self }
+    }
+}
+
+/// Display blocks for the live sidebar (coalesce consecutive location rows under “Posizioni”).
+enum SidebarDisplayBlock: Identifiable {
+    case favorites
+    case recents
+    case locations([SidebarDestination])
+
+    var id: String {
+        switch self {
+        case .favorites: return "favorites"
+        case .recents: return "recents"
+        case .locations(let items): return "locations-" + items.map(\.rawValue).joined(separator: ",")
+        }
+    }
+
+    static func blocks(from ordered: [SidebarDestination]) -> [SidebarDisplayBlock] {
+        var result: [SidebarDisplayBlock] = []
+        var locationBuffer: [SidebarDestination] = []
+
+        func flushLocations() {
+            guard !locationBuffer.isEmpty else { return }
+            result.append(.locations(locationBuffer))
+            locationBuffer = []
+        }
+
+        for destination in ordered {
+            switch destination {
+            case .favorites:
+                flushLocations()
+                result.append(.favorites)
+            case .recents:
+                flushLocations()
+                result.append(.recents)
+            default:
+                locationBuffer.append(destination)
+            }
+        }
+        flushLocations()
+        return result
     }
 }

@@ -6,30 +6,41 @@ struct SettingsRootView: View {
     @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
-        TabView {
+        TabView(selection: $settings.settingsTab) {
             GeneralSettingsView()
                 .environmentObject(settings)
                 .tabItem {
                     Label(L10n.tr("settings.general"), systemImage: "gearshape")
                 }
+                .tag(AppSettings.SettingsTab.general)
 
             SidebarSettingsView()
                 .environmentObject(settings)
                 .tabItem {
                     Label(L10n.tr("settings.sidebar"), systemImage: "sidebar.left")
                 }
+                .tag(AppSettings.SettingsTab.sidebar)
 
             AdvancedSettingsView()
                 .environmentObject(settings)
                 .tabItem {
                     Label(L10n.tr("settings.advanced"), systemImage: "gearshape.2")
                 }
+                .tag(AppSettings.SettingsTab.advanced)
+
+            MenuActionsSettingsView()
+                .environmentObject(settings)
+                .tabItem {
+                    Label(L10n.tr("settings.menu"), systemImage: "contextualmenu.and.cursorarrow")
+                }
+                .tag(AppSettings.SettingsTab.menu)
 
             PluginsSettingsView()
                 .environmentObject(app)
                 .tabItem {
                     Label(L10n.tr("settings.plugins"), systemImage: "puzzlepiece.extension")
                 }
+                .tag(AppSettings.SettingsTab.plugins)
         }
         .padding()
         // Rebuild labels when language preference changes.
@@ -51,12 +62,18 @@ struct SidebarSettingsView: View {
                 .font(.caption)
 
             List {
-                ForEach(settings.orderedSidebarDestinations) { item in
-                    Toggle(isOn: settings.bindingSidebarItem(item)) {
-                        Label(item.localizedTitle, systemImage: item.systemImage)
+                ForEach(SidebarSettingsSection.allCases) { section in
+                    Section(section.title) {
+                        ForEach(settings.orderedSidebarDestinations.filter { $0.settingsSection == section }) { item in
+                            Toggle(isOn: settings.bindingSidebarItem(item)) {
+                                Label(item.localizedTitle, systemImage: item.systemImage)
+                            }
+                        }
+                        .onMove { indices, destination in
+                            settings.moveSidebarItem(in: section, from: indices, to: destination)
+                        }
                     }
                 }
-                .onMove(perform: settings.moveSidebarItem)
             }
             .listStyle(.inset(alternatesRowBackgrounds: true))
 
@@ -64,6 +81,53 @@ struct SidebarSettingsView: View {
                 Spacer()
                 Button(L10n.tr("settings.sidebar.reset_order")) {
                     settings.resetSidebarOrder()
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct MenuActionsSettingsView: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.tr("settings.menu.header"))
+                .foregroundStyle(.secondary)
+                .font(.callout)
+
+            Text(L10n.tr("settings.menu.footer"))
+                .foregroundStyle(.secondary)
+                .font(.caption)
+
+            List {
+                ForEach(ContextMenuActionID.allCases) { action in
+                    HStack {
+                        Text(action.displayName)
+                            .lineLimit(1)
+                        Spacer()
+                        Picker("", selection: Binding(
+                            get: { settings.placement(for: action) },
+                            set: { settings.setPlacement($0, for: action) }
+                        )) {
+                            ForEach(MenuActionPlacement.allCases) { placement in
+                                Text(placement.displayName).tag(placement)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 160)
+                    }
+                }
+            }
+            .listStyle(.inset(alternatesRowBackgrounds: true))
+
+            HStack {
+                Spacer()
+                Button(L10n.tr("settings.menu.reset")) {
+                    settings.resetMenuPlacements()
                 }
                 .buttonStyle(.borderless)
             }
@@ -167,47 +231,9 @@ struct GeneralSettingsView: View {
                 Text(L10n.tr("settings.zoom.footer"))
                     .foregroundStyle(.secondary)
             }
-
-            Section {
-                Button(L10n.tr("settings.privacy.open_fda")) {
-                    PrivacySettingsOpener.openFullDiskAccess()
-                }
-                Button(L10n.tr("settings.privacy.open_files_folders")) {
-                    PrivacySettingsOpener.openFilesAndFolders()
-                }
-            } header: {
-                Text(L10n.tr("settings.privacy.header"))
-            } footer: {
-                Text(L10n.tr("settings.privacy.footer"))
-                    .foregroundStyle(.secondary)
-            }
         }
         .formStyle(.grouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-/// Opens System Settings privacy panes (macOS cannot grant these from the app itself).
-enum PrivacySettingsOpener {
-    static func openFullDiskAccess() {
-        openPrivacyPane(candidates: [
-            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles",
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
-        ])
-    }
-
-    static func openFilesAndFolders() {
-        openPrivacyPane(candidates: [
-            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_FilesAndFolders",
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders",
-        ])
-    }
-
-    private static func openPrivacyPane(candidates: [String]) {
-        for string in candidates {
-            guard let url = URL(string: string) else { continue }
-            if NSWorkspace.shared.open(url) { return }
-        }
     }
 }
 

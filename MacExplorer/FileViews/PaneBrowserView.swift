@@ -14,10 +14,28 @@ struct PaneBrowserView: View {
     let onCreated: (URL) -> Void
     let onPaste: () -> Void
     let onActivate: () -> Void
+    var onOpenInNewPane: (URL) -> Void = { _ in }
+    var onShowViewOptions: () -> Void = {}
     var renameURL: URL?
     @Binding var renameText: String
     var onCommitRename: () -> Void
     var onCancelRename: () -> Void
+
+    private var menuCallbacks: FileMenuCallbacks {
+        FileMenuCallbacks(
+            onRename: onRename,
+            onTrash: onTrash,
+            onRefresh: onRefresh,
+            onCreated: onCreated,
+            onPaste: onPaste,
+            onOpenInNewPane: onOpenInNewPane,
+            onSort: { key in
+                pane.sortKey = key
+                onRefresh()
+            },
+            onShowViewOptions: onShowViewOptions
+        )
+    }
 
     private var displayedItems: [FileItem] {
         guard showsSearchResults else { return pane.items }
@@ -172,11 +190,7 @@ struct PaneBrowserView: View {
                 renameText: $renameText,
                 onCommitRename: onCommitRename,
                 onCancelRename: onCancelRename,
-                onRename: onRename,
-                onTrash: onTrash,
-                onRefresh: onRefresh,
-                onCreated: onCreated,
-                onPaste: onPaste
+                callbacks: menuCallbacks
             )
         }
     }
@@ -186,11 +200,7 @@ struct PaneBrowserView: View {
         FileContextMenu(
             items: [],
             directoryURL: pane.currentURL,
-            onRename: onRename,
-            onTrash: onTrash,
-            onRefresh: onRefresh,
-            onCreated: onCreated,
-            onPaste: onPaste
+            callbacks: menuCallbacks
         )
     }
 
@@ -200,11 +210,7 @@ struct PaneBrowserView: View {
         FileContextMenu(
             items: selected,
             directoryURL: pane.currentURL,
-            onRename: onRename,
-            onTrash: onTrash,
-            onRefresh: onRefresh,
-            onCreated: onCreated,
-            onPaste: onPaste
+            callbacks: menuCallbacks
         )
     }
 

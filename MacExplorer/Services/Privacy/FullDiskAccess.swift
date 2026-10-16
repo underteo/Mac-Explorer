@@ -1,12 +1,11 @@
-import AppKit
 import Foundation
 
-/// Full Disk Access cannot be granted by the app — only detected and routed to System Settings.
+/// Lightweight helpers for detecting Full Disk Access / install path.
+/// The app does not prompt to open System Settings — macOS may ask natively when needed.
 enum FullDiskAccess {
     static let didPromptDefaultsKey = "privacy.didPromptFullDiskAccess"
     static let didWarnDerivedDataKey = "privacy.didWarnDerivedDataPath"
 
-    /// True when this process looks like an Xcode DerivedData build (TCC grants often stick to another copy).
     static var isRunningFromDerivedData: Bool {
         Bundle.main.bundlePath.contains("/DerivedData/")
     }
@@ -15,7 +14,6 @@ enum FullDiskAccess {
         Bundle.main.bundlePath
     }
 
-    /// Prefer the stable /Applications copy when present.
     static var applicationsCopyURL: URL {
         URL(fileURLWithPath: "/Applications/Mac Explorer.app", isDirectory: true)
     }
@@ -24,8 +22,7 @@ enum FullDiskAccess {
         FileManager.default.fileExists(atPath: applicationsCopyURL.path)
     }
 
-    /// Heuristic: actually reading the system TCC database requires Full Disk Access.
-    /// (`isReadableFile` alone is unreliable — the file can appear mode 644 without FDA.)
+    /// Heuristic: reading the system TCC database requires Full Disk Access.
     static func isGranted() -> Bool {
         let tcc = URL(fileURLWithPath: "/Library/Application Support/com.apple.TCC/TCC.db")
         do {
@@ -38,17 +35,15 @@ enum FullDiskAccess {
         }
     }
 
+    /// Kept for tests / legacy defaults; the app no longer auto-prompts on launch.
     static var shouldPromptOnLaunch: Bool {
         if isGranted() { return false }
         return !UserDefaults.standard.bool(forKey: didPromptDefaultsKey)
     }
 
-    /// Warn once when FDA may be granted to /Applications but we're still running DerivedData.
     static var shouldWarnDerivedDataMismatch: Bool {
         guard isRunningFromDerivedData else { return false }
-        guard !UserDefaults.standard.bool(forKey: didWarnDerivedDataKey) else { return false }
-        // Always warn once for DerivedData — Desktop TCC is path-sensitive with ad-hoc builds.
-        return true
+        return !UserDefaults.standard.bool(forKey: didWarnDerivedDataKey)
     }
 
     static func markPrompted() {
@@ -57,17 +52,5 @@ enum FullDiskAccess {
 
     static func markDerivedDataWarned() {
         UserDefaults.standard.set(true, forKey: didWarnDerivedDataKey)
-    }
-
-    static func openSystemSettings() {
-        PrivacySettingsOpener.openFullDiskAccess()
-    }
-
-    static func openApplicationsCopy() {
-        if applicationsCopyExists {
-            NSWorkspace.shared.open(applicationsCopyURL)
-        } else {
-            openSystemSettings()
-        }
     }
 }

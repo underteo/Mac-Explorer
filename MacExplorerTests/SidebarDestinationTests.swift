@@ -17,4 +17,26 @@ final class SidebarDestinationTests: XCTestCase {
         XCTAssertNil(SidebarDestination.recents.resolveURL())
         XCTAssertNil(SidebarDestination.favorites.resolveURL())
     }
+
+    func testLocationsSectionContainsFolderShortcuts() {
+        let locations = SidebarSettingsSection.locations.items
+        XCTAssertTrue(locations.contains(.desktop))
+        XCTAssertTrue(locations.contains(.documents))
+        XCTAssertTrue(locations.contains(.home))
+        XCTAssertTrue(locations.contains(.trash))
+        XCTAssertFalse(locations.contains(.favorites))
+        XCTAssertFalse(locations.contains(.recents))
+        XCTAssertEqual(SidebarDestination.desktop.settingsSection, .locations)
+    }
+
+    func testDisplayBlocksCoalesceLocations() {
+        let blocks = SidebarDisplayBlock.blocks(from: [
+            .favorites, .desktop, .documents, .home, .recents
+        ])
+        XCTAssertEqual(blocks.count, 3)
+        guard case .favorites = blocks[0] else { return XCTFail("favorites first") }
+        guard case .locations(let items) = blocks[1] else { return XCTFail("locations middle") }
+        XCTAssertEqual(items, [.desktop, .documents, .home])
+        guard case .recents = blocks[2] else { return XCTFail("recents last") }
+    }
 }

@@ -32,7 +32,8 @@ struct DirectoryListingService: @unchecked Sendable {
             .contentModificationDateKey,
             .creationDateKey,
             .contentTypeKey,
-            .nameKey
+            .nameKey,
+            .tagNamesKey
         ]
 
         do {
@@ -63,7 +64,8 @@ struct DirectoryListingService: @unchecked Sendable {
             .contentModificationDateKey,
             .creationDateKey,
             .contentTypeKey,
-            .nameKey
+            .nameKey,
+            .tagNamesKey
         ])
         return FileItem(
             url: url,
@@ -74,7 +76,8 @@ struct DirectoryListingService: @unchecked Sendable {
             fileSize: values.isDirectory == true ? nil : Int64(values.fileSize ?? 0),
             contentModificationDate: values.contentModificationDate,
             creationDate: values.creationDate,
-            contentType: values.contentType
+            contentType: values.contentType,
+            tagNames: values.tagNames ?? []
         )
     }
 

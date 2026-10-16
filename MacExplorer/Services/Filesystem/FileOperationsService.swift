@@ -129,6 +129,108 @@ struct FileOperationsService: @unchecked Sendable {
         return destination
     }
 
+    /// Compress items into a `.zip` next to the first item (Finder “Comprimi”).
+    func compress(_ items: [URL]) throws -> URL {
+        guard let first = items.first else {
+            throw FilesystemError.operationFailed("Nothing to compress")
+        }
+        let parent = first.deletingLastPathComponent()
+        let zipName: String
+        if items.count == 1 {
+            zipName = first.lastPathComponent + ".zip"
+        } else {
+            zipName = L10n.tr("default.archive") + ".zip"
+        }
+        let destination = uniqueURL(for: zipName, in: parent)
+        let err = Pipe()
+        let process = Process()
+        process.standardError = err
+
+        if items.count == 1 {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            process.arguments = [
+                "-c", "-k", "--sequesterRsrc", "--keepParent",
+                first.path, destination.path
+            ]
+        } else {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+            process.currentDirectoryURL = parent
+            process.arguments = ["-r", "-q", destination.lastPathComponent]
+                + items.map(\.lastPathComponent)
+        }
+
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0, fileManager.fileExists(atPath: destination.path) else {
+            let message = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw FilesystemError.operationFailed(message?.nilIfEmpty ?? L10n.tr("error.compress"))
+        }
+        return destination
+    }
+
+    /// Creates a Finder alias (bookmark file) next to the item.
+    func makeAlias(of item: URL) throws -> URL {
+        let parent = item.deletingLastPathComponent()
+        let aliasName = L10n.tr("default.alias", item.lastPathComponent)
+        let destination = uniqueURL(for: aliasName, in: parent)
+        let data = try item.bookmarkData(
+            options: [.suitableForBookmarkFile],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        try URL.writeBookmarkData(data, to: destination)
+        return destination
+    }
+
+    func openInTerminal(_ directory: URL, newTab: Bool) {
+        let path = directory.path.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let script: String
+        if newTab {
+            script = """
+            tell application "Terminal"
+              activate
+              if (count of windows) is 0 then
+                do script "cd \\"\(path)\\""
+              else
+                tell application "System Events" to keystroke "t" using command down
+                delay 0.2
+                do script "cd \\"\(path)\\"" in front window
+              end if
+            end tell
+            """
+        } else {
+            script = """
+            tell application "Terminal"
+              activate
+              do script "cd \\"\(path)\\""
+            end tell
+            """
+        }
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+            if error != nil {
+                NSWorkspace.shared.open(directory)
+            }
+        }
+    }
+
+    func openFolderActionsSetup() {
+        let candidates = [
+            "/System/Library/CoreServices/Applications/Folder Actions Setup.app",
+            "/System/Library/CoreServices/Folder Actions Setup.app"
+        ]
+        for path in candidates {
+            let url = URL(fileURLWithPath: path)
+            if fileManager.fileExists(atPath: path) {
+                NSWorkspace.shared.open(url)
+                return
+            }
+        }
+    }
+
     func copyPathToPasteboard(_ urls: [URL]) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects(urls.map(\.path) as [NSString])

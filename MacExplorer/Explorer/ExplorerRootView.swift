@@ -185,6 +185,29 @@ struct ExplorerRootView: View {
             if let message = object as? String {
                 app.lastErrorMessage = message
             }
+        case .explorerCompress:
+            guard !app.isEditingText else { return }
+            Task { await compressSelection() }
+        case .explorerMakeAlias:
+            guard !app.isEditingText else { return }
+            Task { await makeAliasSelection() }
+        case .explorerQuickLook:
+            guard !app.isEditingText else { return }
+            quickLookSelection()
+        case .explorerOpenInNewPane:
+            guard !app.isEditingText else { return }
+            Task { await openInOtherPaneFromSelection() }
+        case .explorerTerminalTab:
+            openTerminalFromSelection(newTab: true)
+        case .explorerTerminalWindow:
+            openTerminalFromSelection(newTab: false)
+        case .explorerCustomizeInFinder:
+            let url = selectedURLs().first ?? app.activePane.currentURL
+            FinderTags.revealFinderInfo(for: url)
+        case .explorerFolderActionsSetup:
+            app.fileOperations.openFolderActionsSetup()
+        case .explorerShowViewOptions:
+            openSettingsWindow()
         default:
             break
         }
@@ -260,6 +283,8 @@ struct ExplorerRootView: View {
                     onCreated: { url in Task { await selectAndBeginRename(url, primary: true) } },
                     onPaste: { Task { await pasteClipboard(to: app.primaryPane.currentURL) } },
                     onActivate: { app.activatePane(.primary) },
+                    onOpenInNewPane: { url in Task { await openInOtherPane(url) } },
+                    onShowViewOptions: { openSettingsWindow() },
                     renameURL: renameTarget?.url,
                     renameText: $renameText,
                     onCommitRename: { Task { await performRename() } },
@@ -276,6 +301,8 @@ struct ExplorerRootView: View {
                     onCreated: { url in Task { await selectAndBeginRename(url, primary: false) } },
                     onPaste: { Task { await pasteClipboard(to: app.secondaryPane.currentURL) } },
                     onActivate: { app.activatePane(.secondary) },
+                    onOpenInNewPane: { url in Task { await openInOtherPane(url) } },
+                    onShowViewOptions: { openSettingsWindow() },
                     renameURL: renameTarget?.url,
                     renameText: $renameText,
                     onCommitRename: { Task { await performRename() } },
@@ -294,6 +321,8 @@ struct ExplorerRootView: View {
                 onCreated: { url in Task { await selectAndBeginRename(url, primary: true) } },
                 onPaste: { Task { await pasteClipboard(to: app.primaryPane.currentURL) } },
                 onActivate: { app.activatePane(.primary) },
+                onOpenInNewPane: { url in Task { await openInOtherPane(url) } },
+                onShowViewOptions: { openSettingsWindow() },
                 renameURL: renameTarget?.url,
                 renameText: $renameText,
                 onCommitRename: { Task { await performRename() } },
@@ -477,6 +506,84 @@ struct ExplorerRootView: View {
             return
         }
         await focusDirectory(url, primary: primary, restoring: [])
+    }
+
+    private func openSettingsWindow() {
+        settings.openSettings(tab: .advanced)
+    }
+
+    /// Open folder in the other dual pane (enables dual-pane if needed).
+    private func openInOtherPane(_ url: URL) async {
+        if !app.dualPaneEnabled {
+            app.dualPaneEnabled = true
+            await refreshSecondary()
+        }
+        let intoPrimary = app.activePaneID == .secondary
+        await focusDirectory(url, primary: intoPrimary, restoring: [])
+    }
+
+    private func openInOtherPaneFromSelection() async {
+        let urls = selectedURLs()
+        let target: URL
+        if let first = urls.first {
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: first.path, isDirectory: &isDir), isDir.boolValue {
+                target = first
+            } else {
+                target = first.deletingLastPathComponent()
+            }
+        } else {
+            target = app.activePane.currentURL
+        }
+        await openInOtherPane(target)
+    }
+
+    private func compressSelection() async {
+        let urls = selectedURLs()
+        guard !urls.isEmpty else { return }
+        do {
+            _ = try app.fileOperations.compress(urls)
+            await refreshPrimary()
+            if app.dualPaneEnabled { await refreshSecondary() }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func makeAliasSelection() async {
+        let urls = selectedURLs()
+        guard !urls.isEmpty else { return }
+        do {
+            for url in urls {
+                _ = try app.fileOperations.makeAlias(of: url)
+            }
+            await refreshPrimary()
+            if app.dualPaneEnabled { await refreshSecondary() }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func quickLookSelection() {
+        let urls = selectedURLs()
+        guard !urls.isEmpty else { return }
+        QuickLookController.shared.show(urls: urls)
+    }
+
+    private func openTerminalFromSelection(newTab: Bool) {
+        let urls = selectedURLs()
+        let folder: URL
+        if let first = urls.first {
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: first.path, isDirectory: &isDir), isDir.boolValue {
+                folder = first
+            } else {
+                folder = first.deletingLastPathComponent()
+            }
+        } else {
+            folder = app.activePane.currentURL
+        }
+        app.fileOperations.openInTerminal(folder, newTab: newTab)
     }
 
     /// Navigate in-pane (column view single-click). Ignores “open folders in tabs”.
@@ -1027,7 +1134,10 @@ private struct ExplorerCommandReceiver: ViewModifier {
             .explorerPaste, .explorerDuplicate, .explorerCopyPath, .explorerGetInfo,
             .explorerTrash, .explorerToggleHidden, .explorerToggleDualPane,
             .explorerInstallPlugin, .explorerReloadPlugins, .explorerRevealPlugins,
-            .explorerPluginInstallFailed
+            .explorerPluginInstallFailed,
+            .explorerCompress, .explorerMakeAlias, .explorerQuickLook,
+            .explorerOpenInNewPane, .explorerTerminalTab, .explorerTerminalWindow,
+            .explorerCustomizeInFinder, .explorerFolderActionsSetup, .explorerShowViewOptions
         ]
         return Publishers.MergeMany(names.map { NotificationCenter.default.publisher(for: $0) })
             .eraseToAnyPublisher()

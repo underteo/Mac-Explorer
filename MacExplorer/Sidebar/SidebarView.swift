@@ -6,14 +6,18 @@ struct SidebarView: View {
 
     var body: some View {
         List {
-            ForEach(settings.orderedVisibleSidebarDestinations) { destination in
-                switch destination {
+            ForEach(SidebarDisplayBlock.blocks(from: settings.orderedVisibleSidebarDestinations)) { block in
+                switch block {
                 case .favorites:
                     favoritesSection
                 case .recents:
                     recentsSection
-                default:
-                    locationRow(destination)
+                case .locations(let items):
+                    Section(L10n.tr("sidebar.section.locations")) {
+                        ForEach(items) { destination in
+                            locationRow(destination)
+                        }
+                    }
                 }
             }
         }

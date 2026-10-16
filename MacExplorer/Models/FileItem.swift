@@ -12,6 +12,8 @@ struct FileItem: Identifiable, Hashable, Sendable {
     let contentModificationDate: Date?
     let creationDate: Date?
     let contentType: UTType?
+    /// Finder tags (`tagNames` resource value) — shared with Finder.
+    let tagNames: [String]
     /// Precomputed at listing time so table cells never hit UTType localization on redraw.
     let kindLabel: String
 
@@ -25,6 +27,7 @@ struct FileItem: Identifiable, Hashable, Sendable {
         contentModificationDate: Date?,
         creationDate: Date?,
         contentType: UTType?,
+        tagNames: [String] = [],
         kindLabel: String? = nil
     ) {
         self.url = url
@@ -36,6 +39,7 @@ struct FileItem: Identifiable, Hashable, Sendable {
         self.contentModificationDate = contentModificationDate
         self.creationDate = creationDate
         self.contentType = contentType
+        self.tagNames = tagNames
         if let kindLabel {
             self.kindLabel = kindLabel
         } else if isDirectory {
@@ -45,6 +49,10 @@ struct FileItem: Identifiable, Hashable, Sendable {
         } else {
             self.kindLabel = url.pathExtension.isEmpty ? "Document" : url.pathExtension.uppercased()
         }
+    }
+
+    var finderColorTags: [FinderColorTag] {
+        FinderTags.colors(in: tagNames)
     }
 
     /// Finder-like display name (optionally hide the extension for files).

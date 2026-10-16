@@ -7,11 +7,19 @@
 | Deployment target | macOS 26.0 (Tahoe); SDK 27 via Xcode 27.1 |
 | Distribution | Outside App Store |
 | App Sandbox | **OFF** |
-| Folder TCC | Cannot be granted in-app; user enables Full Disk Access (or Files & Folders). First launch prompts once if FDA missing (opens System Settings). Settings → General also links there. Prefer `/Applications` over DerivedData so TCC sticks. |
+| Folder TCC | No in-app FDA prompts — macOS may ask once natively. Prefer a stably signed `/Applications/Mac Explorer.app` (`scripts/install_to_applications.sh`) so grants stick across rebuilds. |
 | UI language | Default: system (en+it tables). Overridable in Settings → General |
 | New window location | Configurable (Recents/Home/…); default Recents |
-| Open folders | Prefer tabs (Settings); optional navigate in place |
+| Open folders | Prefer tabs (Settings); optional navigate in place. Column-view drill-down always navigates in-pane (ignores “open in tabs”). |
 | Interface zoom | 50%–150% (default 100%), Settings → General |
+| View modes | Per-pane: grid / list / columns. Dual-pane: independent view switcher in each pane header; toolbar switcher only in single-pane. |
+| Sidebar order | Favorites → locations → Recents by default; user reorder + visibility in Settings → Sidebar |
+| Path bar | Always-editable capsule field; no first-responder steal on window open / pane switch |
+| Advanced prefs | Finder-aligned toggles in Settings → Advanced (extensions, warnings, Trash 30 days via `com.apple.finder` when possible, folders on top, search scope) |
+| Search | Scope: current folder (default) or “this Mac” (home + Applications, capped) |
+| Tags | System Finder tags via `URLResourceValues.tagNames` — not a separate app database |
+| Context vs Actions menu | Configurable per action: **Context** / **Actions** (menu bar Azioni) / **Hidden**. Defaults keep the right-click menu lean; extras (compress, alias, Quick Look, Terminal, open in pane, …) start in Azioni. Right-click always includes **Settings…** deep-link to Settings → Menu. Do not clone Finder’s full Services/Continuity menu. |
+| Dual-pane transfer | Source = active pane selection; destination = other pane |
 | Extensibility | Open With (Launch Services) first; then out-of-process plugins with Settings toggle |
 | Plugin location | `~/Library/Application Support/Mac Explorer/Plugins/` (empty on fresh install; examples only in `Examples/` for optional install) |
 | Distribution | GitHub public **source-available** + proprietary `LICENSE` (no unauthorized redistribution). Packaged `.app` via `scripts/package_app.sh` does not ship plugins. |

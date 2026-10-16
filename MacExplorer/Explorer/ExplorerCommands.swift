@@ -116,6 +116,11 @@ struct ExplorerCommands: Commands {
             .keyboardShortcut(.delete, modifiers: [.command])
         }
 
+        // Separate from Finder’s menu — only actions placed in “Azioni” via Settings.
+        CommandMenu(L10n.tr("menu.actions")) {
+            ActionsMenuCommands()
+        }
+
         CommandMenu(L10n.tr("menu.plugins")) {
             Button(L10n.tr("plugins.install")) {
                 NotificationCenter.default.post(name: .explorerInstallPlugin, object: nil)
@@ -154,4 +159,81 @@ extension Notification.Name {
     static let explorerReloadPlugins = Notification.Name("explorerReloadPlugins")
     static let explorerRevealPlugins = Notification.Name("explorerRevealPlugins")
     static let explorerPluginInstallFailed = Notification.Name("explorerPluginInstallFailed")
+    static let explorerCompress = Notification.Name("explorerCompress")
+    static let explorerMakeAlias = Notification.Name("explorerMakeAlias")
+    static let explorerQuickLook = Notification.Name("explorerQuickLook")
+    static let explorerOpenInNewPane = Notification.Name("explorerOpenInNewPane")
+    static let explorerTerminalTab = Notification.Name("explorerTerminalTab")
+    static let explorerTerminalWindow = Notification.Name("explorerTerminalWindow")
+    static let explorerCustomizeInFinder = Notification.Name("explorerCustomizeInFinder")
+    static let explorerFolderActionsSetup = Notification.Name("explorerFolderActionsSetup")
+    static let explorerShowViewOptions = Notification.Name("explorerShowViewOptions")
+    static let explorerOpenSettings = Notification.Name("explorerOpenSettings")
+}
+
+/// Items whose placement is `.actionsMenu` in Settings.
+private struct ActionsMenuCommands: View {
+    @ObservedObject private var settings = AppSettings.shared
+
+    var body: some View {
+        if settings.showsInActionsMenu(.openInNewPane) {
+            Button(L10n.tr("action.open_in_new_pane")) {
+                NotificationCenter.default.post(name: .explorerOpenInNewPane, object: nil)
+            }
+        }
+        if settings.showsInActionsMenu(.compress) {
+            Button(L10n.tr("action.compress")) {
+                NotificationCenter.default.post(name: .explorerCompress, object: nil)
+            }
+        }
+        if settings.showsInActionsMenu(.makeAlias) {
+            Button(L10n.tr("action.make_alias")) {
+                NotificationCenter.default.post(name: .explorerMakeAlias, object: nil)
+            }
+        }
+        if settings.showsInActionsMenu(.quickLook) {
+            Button(L10n.tr("action.quick_look")) {
+                NotificationCenter.default.post(name: .explorerQuickLook, object: nil)
+            }
+            .keyboardShortcut("y", modifiers: [.command])
+        }
+        if settings.showsInActionsMenu(.terminalTab) {
+            Button(L10n.tr("action.terminal_tab")) {
+                NotificationCenter.default.post(name: .explorerTerminalTab, object: nil)
+            }
+        }
+        if settings.showsInActionsMenu(.terminalWindow) {
+            Button(L10n.tr("action.terminal_window")) {
+                NotificationCenter.default.post(name: .explorerTerminalWindow, object: nil)
+            }
+        }
+        if settings.showsInActionsMenu(.newTextFile) {
+            Button(L10n.tr("action.new_text_file")) {
+                NotificationCenter.default.post(name: .explorerNewFile, object: FileTemplate.txt.rawValue)
+            }
+        }
+        if settings.showsInActionsMenu(.tags) {
+            Text(L10n.tr("action.tags_hint"))
+        }
+        if settings.showsInActionsMenu(.customizeInFinder)
+            || settings.showsInActionsMenu(.folderActionsSetup)
+            || settings.showsInActionsMenu(.showViewOptions) {
+            Divider()
+        }
+        if settings.showsInActionsMenu(.customizeInFinder) {
+            Button(L10n.tr("action.customize_folder")) {
+                NotificationCenter.default.post(name: .explorerCustomizeInFinder, object: nil)
+            }
+        }
+        if settings.showsInActionsMenu(.folderActionsSetup) {
+            Button(L10n.tr("action.folder_actions_setup")) {
+                NotificationCenter.default.post(name: .explorerFolderActionsSetup, object: nil)
+            }
+        }
+        if settings.showsInActionsMenu(.showViewOptions) {
+            Button(L10n.tr("action.show_view_options")) {
+                NotificationCenter.default.post(name: .explorerShowViewOptions, object: nil)
+            }
+        }
+    }
 }

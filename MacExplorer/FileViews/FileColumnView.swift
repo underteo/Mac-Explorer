@@ -61,7 +61,6 @@ struct FileColumnView<ItemMenu: View, BackgroundMenu: View>: View {
         .onChange(of: sortKey) { _, _ in reloadAllColumns() }
         .onChange(of: sortAscending) { _, _ in reloadAllColumns() }
         .onChange(of: app.showHiddenFiles) { _, _ in reloadAllColumns() }
-        .contextMenu { backgroundMenu() }
     }
 
     @ViewBuilder
@@ -76,6 +75,7 @@ struct FileColumnView<ItemMenu: View, BackgroundMenu: View>: View {
         }
         .frame(maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
+        .contextMenu { backgroundMenu() }
     }
 
     @ViewBuilder

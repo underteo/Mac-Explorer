@@ -6,6 +6,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E2B3C4D5E6F708192A3B4B51 /* FinderTagDotsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B3C4D5E6F708192A3B4B52 /* FinderTagDotsView.swift */; };
+		C1A2B3C4D5E6F708192A3B49 /* QuickLookController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4D5E6F708192A3B4A /* QuickLookController.swift */; };
+		C1A2B3C4D5E6F708192A3B47 /* FinderTags.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4D5E6F708192A3B48 /* FinderTags.swift */; };
+		C1A2B3C4D5E6F708192A3B45 /* FileMenuCallbacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4D5E6F708192A3B46 /* FileMenuCallbacks.swift */; };
+		C1A2B3C4D5E6F708192A3B43 /* FileMenuActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4D5E6F708192A3B44 /* FileMenuActions.swift */; };
+		C1A2B3C4D5E6F708192A3B41 /* ContextMenuAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4D5E6F708192A3B42 /* ContextMenuAction.swift */; };
 		2B5E943508B441579F076411 /* FileContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1482A394C744B2A19FE871 /* FileContextMenu.swift */; };
 		D2C86EA19B94479AAE641563 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 208060B7943E412D8261F07D /* AppModel.swift */; };
 		DCC1A6E6629E4F699ABA58BF /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 051D67F72D4D4DCD92B4014A /* AppSettings.swift */; };
@@ -76,6 +82,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		E2B3C4D5E6F708192A3B4B52 /* FinderTagDotsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderTagDotsView.swift; sourceTree = "<group>"; };
+		D1A2B3C4D5E6F708192A3B4A /* QuickLookController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookController.swift; sourceTree = "<group>"; };
+		D1A2B3C4D5E6F708192A3B48 /* FinderTags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderTags.swift; sourceTree = "<group>"; };
+		D1A2B3C4D5E6F708192A3B46 /* FileMenuCallbacks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileMenuCallbacks.swift; sourceTree = "<group>"; };
+		D1A2B3C4D5E6F708192A3B44 /* FileMenuActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileMenuActions.swift; sourceTree = "<group>"; };
+		D1A2B3C4D5E6F708192A3B42 /* ContextMenuAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextMenuAction.swift; sourceTree = "<group>"; };
 		6BC25328B57345E6A89F5224 /* MacExplorer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacExplorer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B0DEB6BB6324F7ABA60CC47 /* MacExplorerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MacExplorerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC1482A394C744B2A19FE871 /* FileContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileContextMenu.swift; sourceTree = "<group>"; };
@@ -164,7 +176,7 @@
 		};
 		1980E006DF9F4033A0B718DD /* Actions */ = {
 			isa = PBXGroup;
-			children = (CC1482A394C744B2A19FE871 /* FileContextMenu.swift */);
+			children = (E2B3C4D5E6F708192A3B4B52 /* FinderTagDotsView.swift */, D1A2B3C4D5E6F708192A3B42 /* ContextMenuAction.swift */, D1A2B3C4D5E6F708192A3B44 /* FileMenuActions.swift */, D1A2B3C4D5E6F708192A3B46 /* FileMenuCallbacks.swift */, CC1482A394C744B2A19FE871 /* FileContextMenu.swift */);
 			path = Actions;
 			sourceTree = "<group>";
 		};
@@ -236,13 +248,13 @@
 		};
 		5D749EDC20804526BD5398CD /* Filesystem */ = {
 			isa = PBXGroup;
-			children = (7EB648CDAA2942BDA55811D8 /* DirectoryListingService.swift */, 93D7D781D1DC44D6BB1913B9 /* DirectorySearchService.swift */, 485A482977DA440F87B7893F /* FileIconCache.swift */, E75EAD2A7FEA42CDA8B50229 /* FileOperationsService.swift */);
+			children = (D1A2B3C4D5E6F708192A3B48 /* FinderTags.swift */, 7EB648CDAA2942BDA55811D8 /* DirectoryListingService.swift */, 93D7D781D1DC44D6BB1913B9 /* DirectorySearchService.swift */, 485A482977DA440F87B7893F /* FileIconCache.swift */, E75EAD2A7FEA42CDA8B50229 /* FileOperationsService.swift */);
 			path = Filesystem;
 			sourceTree = "<group>";
 		};
 		D8C29AB2FF954D1F964C04D9 /* OpenWith */ = {
 			isa = PBXGroup;
-			children = (32DAA3E5FA154E1180937E3C /* OpenWithService.swift */);
+			children = (D1A2B3C4D5E6F708192A3B4A /* QuickLookController.swift */, 32DAA3E5FA154E1180937E3C /* OpenWithService.swift */);
 			path = OpenWith;
 			sourceTree = "<group>";
 		};
@@ -335,7 +347,7 @@
 		8363B629DEF648B5928A33B9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (2B5E943508B441579F076411 /* FileContextMenu.swift in Sources */, D2C86EA19B94479AAE641563 /* AppModel.swift in Sources */, DCC1A6E6629E4F699ABA58BF /* AppSettings.swift in Sources */, A231CDB6680942E2A4BD6AD0 /* L10n.swift in Sources */, 4DBED3A2AB554C18B01078AE /* MacExplorerApp.swift in Sources */, 99861A4506FB42DB97A40AC8 /* GlassChrome.swift in Sources */, 377F769B6F2C494DAEFB1330 /* ExplorerCommands.swift in Sources */, E4D681C1A5BB41BD96444128 /* ExplorerRootView.swift in Sources */, 07994FE4B4AD4CBBAB9C885B /* GetInfoSheet.swift in Sources */, 5B716491CC9E4348971771EE /* PaneController.swift in Sources */, EFD4667B5ABF4A508AA6CD0A /* PathLocationBar.swift in Sources */, A8C4F21E9B7D4E6A8F3C1D20 /* FileColumnView.swift in Sources */, 25C2CD1BFE22497C8B77F00B /* FileGridView.swift in Sources */, BC78E4FCD0EA4D2D97227A42 /* FileListView.swift in Sources */, E126B8DA5FC24150891205C2 /* FileTableNSMenuFactory.swift in Sources */, D75AC0B4B96444EE8ABC219D /* InlineRenameField.swift in Sources */, 68B6F651CA244B9B883A17C7 /* NativeFileTableView.swift in Sources */, 4F47F13524524847883B3E71 /* PaneBrowserView.swift in Sources */, 7A46C1FC444C4A0EA5983C5F /* ExplorerTab.swift in Sources */, 83A9B832B0894D3C8FC05D06 /* FileInfo.swift in Sources */, 5B1B7215A343481D90F22748 /* FileItem.swift in Sources */, 593D7C83818D45A18A3EE782 /* NavigationHistory.swift in Sources */, 70131FFF56D64134B0B923A1 /* SidebarDestination.swift in Sources */, BD0EE2457A3D404BA86903C6 /* PluginDirectoryWatcher.swift in Sources */, 984B5358D6B14693A49DC4B6 /* PluginInstaller.swift in Sources */, 29742DE7ABAA4C77A4C5E441 /* PluginManager.swift in Sources */, 3ED8F913F4FC45EFA9A3C601 /* PluginManifest.swift in Sources */, 623E1FB5B9F44DFFA8EAF969 /* FavoritesStore.swift in Sources */, 26B142B55F3D44C8BA43C05B /* RecentsStore.swift in Sources */, 6E0D76F8D287407096C3ECA9 /* DirectoryListingService.swift in Sources */, C5B7761B47804F9F94B48E7F /* DirectorySearchService.swift in Sources */, B3FFD3078B5148BFB4DF7137 /* FileIconCache.swift in Sources */, A1AF623947294722BCF48AF9 /* FileOperationsService.swift in Sources */, 72D3F997E835437B86078DE8 /* OpenWithService.swift in Sources */, 5FF3CE43DA214EE793CF68F0 /* FullDiskAccess.swift in Sources */, EECD1713C5BF40588C596EB1 /* SettingsRootView.swift in Sources */, A04E4A8710ED453CA4DE3613 /* SidebarView.swift in Sources */);
+			files = (E2B3C4D5E6F708192A3B4B51 /* FinderTagDotsView.swift in Sources */, C1A2B3C4D5E6F708192A3B41 /* ContextMenuAction.swift in Sources */, C1A2B3C4D5E6F708192A3B43 /* FileMenuActions.swift in Sources */, C1A2B3C4D5E6F708192A3B45 /* FileMenuCallbacks.swift in Sources */, C1A2B3C4D5E6F708192A3B47 /* FinderTags.swift in Sources */, C1A2B3C4D5E6F708192A3B49 /* QuickLookController.swift in Sources */, 2B5E943508B441579F076411 /* FileContextMenu.swift in Sources */, D2C86EA19B94479AAE641563 /* AppModel.swift in Sources */, DCC1A6E6629E4F699ABA58BF /* AppSettings.swift in Sources */, A231CDB6680942E2A4BD6AD0 /* L10n.swift in Sources */, 4DBED3A2AB554C18B01078AE /* MacExplorerApp.swift in Sources */, 99861A4506FB42DB97A40AC8 /* GlassChrome.swift in Sources */, 377F769B6F2C494DAEFB1330 /* ExplorerCommands.swift in Sources */, E4D681C1A5BB41BD96444128 /* ExplorerRootView.swift in Sources */, 07994FE4B4AD4CBBAB9C885B /* GetInfoSheet.swift in Sources */, 5B716491CC9E4348971771EE /* PaneController.swift in Sources */, EFD4667B5ABF4A508AA6CD0A /* PathLocationBar.swift in Sources */, A8C4F21E9B7D4E6A8F3C1D20 /* FileColumnView.swift in Sources */, 25C2CD1BFE22497C8B77F00B /* FileGridView.swift in Sources */, BC78E4FCD0EA4D2D97227A42 /* FileListView.swift in Sources */, E126B8DA5FC24150891205C2 /* FileTableNSMenuFactory.swift in Sources */, D75AC0B4B96444EE8ABC219D /* InlineRenameField.swift in Sources */, 68B6F651CA244B9B883A17C7 /* NativeFileTableView.swift in Sources */, 4F47F13524524847883B3E71 /* PaneBrowserView.swift in Sources */, 7A46C1FC444C4A0EA5983C5F /* ExplorerTab.swift in Sources */, 83A9B832B0894D3C8FC05D06 /* FileInfo.swift in Sources */, 5B1B7215A343481D90F22748 /* FileItem.swift in Sources */, 593D7C83818D45A18A3EE782 /* NavigationHistory.swift in Sources */, 70131FFF56D64134B0B923A1 /* SidebarDestination.swift in Sources */, BD0EE2457A3D404BA86903C6 /* PluginDirectoryWatcher.swift in Sources */, 984B5358D6B14693A49DC4B6 /* PluginInstaller.swift in Sources */, 29742DE7ABAA4C77A4C5E441 /* PluginManager.swift in Sources */, 3ED8F913F4FC45EFA9A3C601 /* PluginManifest.swift in Sources */, 623E1FB5B9F44DFFA8EAF969 /* FavoritesStore.swift in Sources */, 26B142B55F3D44C8BA43C05B /* RecentsStore.swift in Sources */, 6E0D76F8D287407096C3ECA9 /* DirectoryListingService.swift in Sources */, C5B7761B47804F9F94B48E7F /* DirectorySearchService.swift in Sources */, B3FFD3078B5148BFB4DF7137 /* FileIconCache.swift in Sources */, A1AF623947294722BCF48AF9 /* FileOperationsService.swift in Sources */, 72D3F997E835437B86078DE8 /* OpenWithService.swift in Sources */, 5FF3CE43DA214EE793CF68F0 /* FullDiskAccess.swift in Sources */, EECD1713C5BF40588C596EB1 /* SettingsRootView.swift in Sources */, A04E4A8710ED453CA4DE3613 /* SidebarView.swift in Sources */);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		874F09D017674BE4A416F3E9 /* Sources */ = {

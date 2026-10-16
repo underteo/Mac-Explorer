@@ -13,11 +13,7 @@ struct FileListView: View {
     @Binding var renameText: String
     var onCommitRename: () -> Void
     var onCancelRename: () -> Void
-    var onRename: (FileItem) -> Void
-    var onTrash: () -> Void
-    var onRefresh: () -> Void
-    var onCreated: (URL) -> Void
-    var onPaste: () -> Void
+    var callbacks: FileMenuCallbacks
 
     var body: some View {
         NativeFileTableView(
@@ -35,11 +31,8 @@ struct FileListView: View {
                     items: items,
                     directoryURL: directoryURL,
                     app: app,
-                    onRename: onRename,
-                    onTrash: onTrash,
-                    onRefresh: onRefresh,
-                    onCreated: onCreated,
-                    onPaste: onPaste
+                    settings: settings,
+                    callbacks: callbacks
                 )
             }
         )

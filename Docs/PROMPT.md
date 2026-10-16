@@ -14,8 +14,11 @@ Senior macOS engineer. Explain new concepts in simple Italian. One phase at a ti
 6. UI state separate from filesystem I/O; explicit errors.
 7. Trash via system API; confirm destructive actions.
 8. Do not bypass permissions or invent unavailable APIs.
-9. UI strings only via String Catalog / `String(localized:)`.
+9. UI strings only via `Localizable.strings` / `L10n.tr` (en + it).
 10. Tests use temporary directories only — never the user’s real Documents.
+11. Keep the right-click menu lean; new actions go behind Settings → Menu placements (Context / Azioni / Hidden) unless the user asks otherwise.
+12. Reuse Finder system tags (`tagNames`); do not invent a parallel tag store.
+13. List = AppKit context menu; grid/columns = SwiftUI — same action set via shared builders; avoid double menus.
 
 ## Phase gate
 

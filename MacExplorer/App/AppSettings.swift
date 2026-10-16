@@ -7,6 +7,19 @@ import SwiftUI
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
+    enum SettingsTab: String, CaseIterable, Identifiable, Hashable {
+        case general
+        case sidebar
+        case advanced
+        case menu
+        case plugins
+
+        var id: String { rawValue }
+    }
+
+    /// Selected Settings window tab (also used as deep-link from the context menu).
+    @Published var settingsTab: SettingsTab = .general
+
     enum LanguagePreference: String, CaseIterable, Identifiable {
         case system
         case english
@@ -80,6 +93,7 @@ final class AppSettings: ObservableObject {
         static let foldersOnTopName = "settings.keepFoldersOnTopWhenSortingByName"
         static let foldersOnTopDesktop = "settings.keepFoldersOnTopOnDesktop"
         static let searchScope = "settings.searchScope"
+        static let menuPlacements = "settings.menuActionPlacements"
     }
 
     enum SearchScope: String, CaseIterable, Identifiable {
@@ -198,6 +212,11 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(searchScope.rawValue, forKey: Keys.searchScope) }
     }
 
+    /// Per-action placement: context menu / Azioni menu / hidden.
+    @Published var menuActionPlacements: [String: String] {
+        didSet { defaults.set(menuActionPlacements, forKey: Keys.menuPlacements) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -246,6 +265,52 @@ final class AppSettings: ObservableObject {
 
         let scopeRaw = defaults.string(forKey: Keys.searchScope) ?? SearchScope.currentFolder.rawValue
         self.searchScope = SearchScope(rawValue: scopeRaw) ?? .currentFolder
+
+        if let saved = defaults.dictionary(forKey: Keys.menuPlacements) as? [String: String] {
+            self.menuActionPlacements = saved
+        } else {
+            self.menuActionPlacements = [:]
+        }
+    }
+
+    func placement(for action: ContextMenuActionID) -> MenuActionPlacement {
+        if let raw = menuActionPlacements[action.rawValue],
+           let value = MenuActionPlacement(rawValue: raw) {
+            return value
+        }
+        return action.defaultPlacement
+    }
+
+    func setPlacement(_ placement: MenuActionPlacement, for action: ContextMenuActionID) {
+        var next = menuActionPlacements
+        if placement == action.defaultPlacement {
+            next.removeValue(forKey: action.rawValue)
+        } else {
+            next[action.rawValue] = placement.rawValue
+        }
+        menuActionPlacements = next
+    }
+
+    func showsInContextMenu(_ action: ContextMenuActionID) -> Bool {
+        placement(for: action) == .context
+    }
+
+    func showsInActionsMenu(_ action: ContextMenuActionID) -> Bool {
+        placement(for: action) == .actionsMenu
+    }
+
+    func resetMenuPlacements() {
+        menuActionPlacements = [:]
+    }
+
+    /// Opens the Settings window on the given tab (default: Menu visibility).
+    /// Actual presentation is handled via `\.openSettings` in the app (context menus can't call it directly).
+    func openSettings(tab: SettingsTab = .menu) {
+        settingsTab = tab
+        // Defer so NSMenu can dismiss before the Settings scene becomes key.
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .explorerOpenSettings, object: nil)
+        }
     }
 
     func keepFoldersOnTop(directory: URL, sortKey: FileSortKey) -> Bool {
@@ -294,6 +359,31 @@ final class AppSettings: ObservableObject {
         var order = orderedSidebarDestinations.map(\.rawValue)
         order.move(fromOffsets: source, toOffset: destination)
         sidebarOrder = order
+    }
+
+    /// Reorder items within one settings section (e.g. Posizioni) while preserving overall section layout.
+    func moveSidebarItem(in section: SidebarSettingsSection, from source: IndexSet, to destination: Int) {
+        var sectionItems = orderedSidebarDestinations.filter { $0.settingsSection == section }
+        sectionItems.move(fromOffsets: source, toOffset: destination)
+        let sectionIDs = sectionItems.map(\.rawValue)
+
+        var rebuilt: [String] = []
+        var sectionInserted = false
+        for raw in orderedSidebarDestinations.map(\.rawValue) {
+            guard let dest = SidebarDestination(rawValue: raw) else { continue }
+            if dest.settingsSection == section {
+                if !sectionInserted {
+                    rebuilt.append(contentsOf: sectionIDs)
+                    sectionInserted = true
+                }
+            } else {
+                rebuilt.append(raw)
+            }
+        }
+        if !sectionInserted {
+            rebuilt.append(contentsOf: sectionIDs)
+        }
+        sidebarOrder = Self.normalizedSidebarOrder(rebuilt)
     }
 
     func resetSidebarOrder() {

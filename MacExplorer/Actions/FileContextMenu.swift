@@ -1,104 +1,192 @@
 import SwiftUI
 import AppKit
 
+/// Right-click menu — only actions whose placement is `.context` (see Settings → Menu).
 struct FileContextMenu: View {
     @EnvironmentObject private var app: AppModel
+    @EnvironmentObject private var settings: AppSettings
     let items: [FileItem]
     let directoryURL: URL
-    let onRename: (FileItem) -> Void
-    let onTrash: () -> Void
-    let onRefresh: () -> Void
-    let onCreated: (URL) -> Void
-    let onPaste: () -> Void
+    let callbacks: FileMenuCallbacks
+
+    private func show(_ action: ContextMenuActionID) -> Bool {
+        settings.showsInContextMenu(action)
+    }
 
     var body: some View {
         Group {
-            if !items.isEmpty {
+            if !items.isEmpty, show(.open) {
                 Button(L10n.tr("action.open")) {
-                    items.forEach { app.fileOperations.open($0.url) }
-                }
-                openWithSection
-                Divider()
-            }
-
-            Button(L10n.tr("action.new_folder")) {
-                do {
-                    let url = try app.fileOperations.createFolder(named: L10n.tr("default.new_folder"), in: directoryURL)
-                    onCreated(url)
-                } catch {
-                    app.lastErrorMessage = error.localizedDescription
+                    FileMenuActions.open(items, app: app)
                 }
             }
+            if show(.openWith) { openWithSection }
 
-            Menu(L10n.tr("action.new_file")) {
-                ForEach(FileTemplate.allCases) { template in
-                    Button(template.displayName) {
-                        do {
-                            let url = try app.fileOperations.createFile(template: template, in: directoryURL)
-                            onCreated(url)
-                        } catch {
-                            app.lastErrorMessage = error.localizedDescription
+            if show(.newFolder) {
+                Button(L10n.tr("action.new_folder")) {
+                    FileMenuActions.newFolder(in: directoryURL, app: app, onCreated: callbacks.onCreated)
+                }
+            }
+            if show(.newFile) {
+                Menu(L10n.tr("action.new_file")) {
+                    ForEach(FileTemplate.allCases) { template in
+                        Button(template.displayName) {
+                            FileMenuActions.newFile(
+                                template: template,
+                                in: directoryURL,
+                                app: app,
+                                onCreated: callbacks.onCreated
+                            )
                         }
                     }
                 }
             }
-
-            if items.count == 1, let item = items.first {
-                Button(L10n.tr("action.rename")) {
-                    onRename(item)
+            if show(.newTextFile) {
+                Button(L10n.tr("action.new_text_file")) {
+                    FileMenuActions.newFile(
+                        template: .txt,
+                        in: directoryURL,
+                        app: app,
+                        onCreated: callbacks.onCreated
+                    )
                 }
+            }
+            if show(.openInNewPane) {
+                Button(L10n.tr("action.open_in_new_pane")) {
+                    FileMenuActions.openInNewPane(
+                        items: items,
+                        directoryURL: directoryURL,
+                        callbacks: callbacks
+                    )
+                }
+            }
+
+            if !items.isEmpty, items.count == 1, show(.rename), let item = items.first {
+                Button(L10n.tr("action.rename")) { callbacks.onRename(item) }
             }
 
             if !items.isEmpty {
-                Button(L10n.tr("action.copy")) {
-                    app.copyToClipboard(items.map(\.url), cut: false)
+                if show(.copy) {
+                    Button(L10n.tr("action.copy")) { FileMenuActions.copy(items, app: app) }
                 }
-                Button(L10n.tr("action.cut")) {
-                    app.copyToClipboard(items.map(\.url), cut: true)
+                if show(.cut) {
+                    Button(L10n.tr("action.cut")) { FileMenuActions.cut(items, app: app) }
                 }
-                Button(L10n.tr("action.duplicate")) {
-                    do {
-                        for item in items {
-                            _ = try app.fileOperations.duplicate(item.url)
-                        }
-                        onRefresh()
-                    } catch {
-                        app.lastErrorMessage = error.localizedDescription
+                if show(.duplicate) {
+                    Button(L10n.tr("action.duplicate")) {
+                        FileMenuActions.duplicate(items, app: app, onRefresh: callbacks.onRefresh)
                     }
                 }
-                Button(L10n.tr("action.copy_path")) {
-                    app.fileOperations.copyPathToPasteboard(items.map(\.url))
-                }
-                Button(L10n.tr("action.get_info")) {
-                    if let first = items.first {
-                        do {
-                            app.infoSummary = try app.fileOperations.makeInfo(for: first.url)
-                        } catch {
-                            app.lastErrorMessage = error.localizedDescription
-                        }
+                if show(.compress) {
+                    Button(FileMenuActions.compressTitle(for: items)) {
+                        FileMenuActions.compress(items, app: app, onRefresh: callbacks.onRefresh)
                     }
                 }
-                Button(L10n.tr("action.reveal_finder")) {
-                    app.fileOperations.revealInFinder(items.map(\.url))
+                if show(.makeAlias) {
+                    Button(L10n.tr("action.make_alias")) {
+                        FileMenuActions.makeAlias(items, app: app, onRefresh: callbacks.onRefresh)
+                    }
+                }
+                if show(.quickLook) {
+                    Button(L10n.tr("action.quick_look")) { FileMenuActions.quickLook(items) }
+                }
+                if show(.copyPath) {
+                    Button(L10n.tr("action.copy_path")) { FileMenuActions.copyPath(items, app: app) }
+                }
+                if show(.getInfo) {
+                    Button(L10n.tr("action.get_info")) { FileMenuActions.getInfo(items, app: app) }
+                }
+                if show(.revealInFinder) {
+                    Button(L10n.tr("action.reveal_finder")) {
+                        FileMenuActions.revealInFinder(items, app: app)
+                    }
                 }
             }
 
-            if app.fileClipboard != nil {
+            if show(.paste), app.fileClipboard != nil {
                 Button(L10n.tr("action.paste")) {
-                    onPaste()
+                    FileMenuActions.paste(app: app, onPaste: callbacks.onPaste)
                 }
             }
 
-            favoritesSection
-
-            Divider()
-
-            pluginSection
-
-            if !items.isEmpty {
-                Button(L10n.tr("action.move_to_trash"), role: .destructive) {
-                    onTrash()
+            if !items.isEmpty, show(.tags) {
+                Divider()
+                tagSection
+                // Finder layout: color dots, then “Personalizza cartella…” with tag icon.
+                Button {
+                    FileMenuActions.customizeInFinder(items, directoryURL: directoryURL)
+                } label: {
+                    Label(L10n.tr("action.customize_folder"), systemImage: "tag")
                 }
+                Divider()
+            } else if show(.customizeInFinder) {
+                Button {
+                    FileMenuActions.customizeInFinder(items, directoryURL: directoryURL)
+                } label: {
+                    Label(L10n.tr("action.customize_folder"), systemImage: "tag")
+                }
+            }
+            if show(.sortBy) { sortSection }
+            if show(.showViewOptions) {
+                Button(L10n.tr("action.show_view_options")) { callbacks.onShowViewOptions() }
+            }
+            if show(.folderActionsSetup) {
+                Button(L10n.tr("action.folder_actions_setup")) {
+                    app.fileOperations.openFolderActionsSetup()
+                }
+            }
+            if show(.terminalTab) {
+                Button(L10n.tr("action.terminal_tab")) {
+                    FileMenuActions.openTerminal(at: directoryURL, newTab: true, items: items, app: app)
+                }
+            }
+            if show(.terminalWindow) {
+                Button(L10n.tr("action.terminal_window")) {
+                    FileMenuActions.openTerminal(at: directoryURL, newTab: false, items: items, app: app)
+                }
+            }
+
+            if show(.favorites) { favoritesSection }
+            if show(.plugins) { pluginSection }
+
+            if !items.isEmpty, show(.trash) {
+                Divider()
+                Button(L10n.tr("action.move_to_trash"), role: .destructive) {
+                    callbacks.onTrash()
+                }
+            }
+
+            // Always available — shortcut to visibility settings for this menu.
+            Divider()
+            Button(L10n.tr("action.menu_settings")) {
+                settings.openSettings(tab: .menu)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var tagSection: some View {
+        FinderTagDotsRow(selectedColors: selectedTagColors) { color in
+            FileMenuActions.toggleTag(color, items: items, app: app, onRefresh: callbacks.onRefresh)
+        }
+    }
+
+    private var selectedTagColors: Set<FinderColorTag> {
+        var set = Set<FinderColorTag>()
+        for item in items {
+            for color in FinderColorTag.allCases where FinderTags.isOn(color, for: item.url)
+                || item.finderColorTags.contains(color) {
+                set.insert(color)
+            }
+        }
+        return set
+    }
+
+    @ViewBuilder
+    private var sortSection: some View {
+        Menu(L10n.tr("action.sort_by")) {
+            ForEach(FileSortKey.allCases) { key in
+                Button(L10n.tr("sort.\(key.rawValue)")) { callbacks.onSort(key) }
             }
         }
     }
@@ -122,30 +210,16 @@ struct FileContextMenu: View {
 
     @ViewBuilder
     private var favoritesSection: some View {
-        if items.count == 1, let item = items.first, item.isDirectory {
-            favoriteButtons(for: item.url)
-        } else if items.isEmpty {
-            // Empty background: allow favoriting the folder currently shown.
-            favoriteButtons(for: directoryURL)
-        }
-    }
-
-    @ViewBuilder
-    private func favoriteButtons(for url: URL) -> some View {
+        let url = FileMenuActions.favoriteURL(items: items, directoryURL: directoryURL)
         if app.isFavorite(url) {
-            Button(L10n.tr("favorites.remove")) {
-                app.removeFavorite(url: url)
-            }
+            Button(L10n.tr("favorites.remove")) { app.removeFavorite(url: url) }
         } else {
-            Button(L10n.tr("favorites.add")) {
-                _ = app.addFavorite(url)
-            }
+            Button(L10n.tr("favorites.add")) { _ = app.addFavorite(url) }
         }
     }
 
     @ViewBuilder
     private var pluginSection: some View {
-        // Empty background → current folder, so plugins can act on the pane directory.
         let pluginItems = PluginMenuTargets.resolve(selected: items, directoryURL: directoryURL)
         let plugins = app.pluginManager.enabledMenuProviders(for: pluginItems)
         ForEach(plugins) { plugin in
@@ -157,9 +231,6 @@ struct FileContextMenu: View {
                     }
                 }
             }
-        }
-        if !plugins.isEmpty {
-            Divider()
         }
     }
 }
