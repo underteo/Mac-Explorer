@@ -12,7 +12,7 @@ CONFIGURATION="${CONFIGURATION:-Release}"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
-echo "Building $CONFIGURATION…"
+echo "Building ${CONFIGURATION}..."
 xcodebuild \
   -project "$ROOT/MacExplorer.xcodeproj" \
   -scheme MacExplorer \

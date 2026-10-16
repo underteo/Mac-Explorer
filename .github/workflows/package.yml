@@ -1,0 +1,68 @@
+# Build MacExplorer-macOS.zip and attach it to a GitHub Release.
+# Trigger: push a tag like v0.1.0, or run manually from the Actions tab.
+name: Package
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to create/update (e.g. v0.1.1). Leave empty to only upload an artifact."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          # Prefer a full Xcode app on the runner; fall back to default.
+          if [ -d /Applications/Xcode.app ]; then
+            echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          fi
+          xcodebuild -version
+
+      - name: Package app
+        run: ./scripts/package_app.sh
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacExplorer-macOS
+          path: dist/MacExplorer-macOS.zip
+          if-no-files-found: error
+
+      - name: Create / update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag_name != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}
+        run: |
+          set -eu
+          ZIP="dist/MacExplorer-macOS.zip"
+          NOTES="$(mktemp)"
+          cat > "$NOTES" <<EOF
+          Mac Explorer for macOS (ad-hoc signed).
+
+          Install:
+          1. Unzip \`MacExplorer-macOS.zip\`
+          2. Drag \`Mac Explorer.app\` to Applications
+          3. First launch: right-click → Open (Gatekeeper)
+
+          Requires macOS Tahoe 26+. No plugins are bundled.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" --clobber
+          else
+            gh release create "$TAG" "$ZIP" --title "Mac Explorer $TAG" --notes-file "$NOTES"
+          fi

@@ -22,6 +22,7 @@
 | Context vs Actions menu | Configurable per action: **Context** / **Actions** (menu bar Azioni) / **Both** / **Hidden**. Defaults keep the right-click menu lean; extras (compress, alias, Quick Look, Terminal, open in pane, …) start in Azioni. Right-click always includes **Settings…** deep-link to Settings → Menu. Do not clone Finder’s full Services/Continuity menu. |
 | Dual-pane transfer | Source = active pane selection; destination = other pane. Toolbar buttons always visible; disabled when single-pane or empty selection. |
 | Install script | `scripts/install_to_applications.sh` always builds Release, installs to `/Applications`, then removes other DerivedData/dist `.app` copies so TCC stays on the Applications bundle. |
+| Share / package | `scripts/package_app.sh` → ad-hoc `.app` + zip under `dist/` (gitignored). Publish via GitHub Releases (`v*` tags / Actions `Package` workflow). See `Docs/INSTALL.md`. |
 | Extensibility | Open With (Launch Services) first; then out-of-process plugins with Settings toggle |
 | Plugin location | `~/Library/Application Support/Mac Explorer/Plugins/` (empty on fresh install; examples only in `Examples/` for optional install) |
 | Distribution | GitHub public **source-available** + proprietary `LICENSE` (no unauthorized redistribution). Packaged `.app` via `scripts/package_app.sh` does not ship plugins. |

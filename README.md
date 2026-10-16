@@ -71,16 +71,17 @@ Run in Xcode with **⌘R**.
 - Menu bar commands and keyboard shortcuts
 - Out-of-process plugins with hot reload; install from **Plugins → Install Plugin…**
 
-## Install (end users)
+## Install / share
 
-```bash
-./scripts/package_app.sh
-# → dist/Mac Explorer.app  and  dist/MacExplorer-macOS.zip
-```
+Full guide: [Docs/INSTALL.md](Docs/INSTALL.md)
 
-Copy `Mac Explorer.app` to `/Applications`. **No plugins are bundled.** On first launch the app creates an empty:
+| Who | What |
+|-----|------|
+| **Friend / tester** | Download `MacExplorer-macOS.zip` from [Releases](https://github.com/underteo/Mac-Explorer/releases) → Applications → right-click → Open |
+| **You, package for others** | `./scripts/package_app.sh` → zip in `dist/` (gitignored), or `git tag v0.x.y && git push --tags` (Actions uploads the Release) |
+| **You, daily local install** | `./scripts/install_to_applications.sh` |
 
-`~/Library/Application Support/Mac Explorer/Plugins/`
+Repo: https://github.com/underteo/Mac-Explorer (public source). **No plugins** are bundled; first launch creates `~/Library/Application Support/Mac Explorer/Plugins/`.
 
 ## Plugins (optional)
 
