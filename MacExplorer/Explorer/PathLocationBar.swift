@@ -20,8 +20,18 @@ struct PathLocationBar: View {
             .accessibilityLabel(L10n.tr("path.edit"))
             .accessibilityValue(draftPath)
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                Capsule(style: .continuous)
+                    .fill(Color.primary.opacity(fieldFocused ? 0.10 : 0.06))
+            }
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.primary.opacity(fieldFocused ? 0.22 : 0.10), lineWidth: 1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .onAppear {
                 draftPath = url.path
                 // Don't steal keyboard focus at window open / pane switch.

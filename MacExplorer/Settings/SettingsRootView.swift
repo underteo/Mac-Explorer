@@ -19,6 +19,12 @@ struct SettingsRootView: View {
                     Label(L10n.tr("settings.sidebar"), systemImage: "sidebar.left")
                 }
 
+            AdvancedSettingsView()
+                .environmentObject(settings)
+                .tabItem {
+                    Label(L10n.tr("settings.advanced"), systemImage: "gearshape.2")
+                }
+
             PluginsSettingsView()
                 .environmentObject(app)
                 .tabItem {
@@ -63,6 +69,44 @@ struct SidebarSettingsView: View {
             }
         }
         .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct AdvancedSettingsView: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(L10n.tr("settings.advanced.show_extensions"), isOn: $settings.showAllFilenameExtensions)
+                Toggle(L10n.tr("settings.advanced.warn_extension"), isOn: $settings.warnBeforeChangingExtension)
+                Toggle(L10n.tr("settings.advanced.warn_icloud"), isOn: $settings.warnBeforeRemovingFromiCloud)
+                Toggle(L10n.tr("settings.advanced.warn_empty_trash"), isOn: $settings.warnBeforeEmptyingTrash)
+                Toggle(L10n.tr("settings.advanced.remove_trash_30"), isOn: $settings.removeTrashAfter30Days)
+            } footer: {
+                Text(L10n.tr("settings.advanced.trash_footer"))
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle(L10n.tr("settings.advanced.folders_on_top_name"), isOn: $settings.keepFoldersOnTopWhenSortingByName)
+                Toggle(L10n.tr("settings.advanced.folders_on_top_desktop"), isOn: $settings.keepFoldersOnTopOnDesktop)
+            } header: {
+                Text(L10n.tr("settings.advanced.folders_on_top_header"))
+            }
+
+            Section {
+                Picker(L10n.tr("settings.advanced.search_header"), selection: $settings.searchScope) {
+                    ForEach(AppSettings.SearchScope.allCases) { scope in
+                        Text(scope.displayName).tag(scope)
+                    }
+                }
+            } header: {
+                Text(L10n.tr("settings.advanced.search_section"))
+            }
+        }
+        .formStyle(.grouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

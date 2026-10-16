@@ -11,6 +11,8 @@ final class LocalizationSmokeTests: XCTestCase {
             "toolbar.refresh",
             "state.empty.title",
             "settings.plugins",
+            "settings.advanced",
+            "settings.advanced.show_extensions",
             "path.edit",
             "command.new_window",
             "command.new_tab"

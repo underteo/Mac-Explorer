@@ -90,7 +90,12 @@ struct SidebarView: View {
     private func navigate(to url: URL) {
         Task { @MainActor in
             var pane = app.primaryPane
-            await PaneController.navigate(&pane, to: url, using: app.filesystem)
+            await PaneController.navigate(
+                &pane,
+                to: url,
+                using: app.filesystem,
+                keepFoldersOnTop: settings.keepFoldersOnTop(directory: url, sortKey: pane.sortKey)
+            )
             app.primaryPane = pane
             var tab = app.selectedTab
             tab.title = url.lastPathComponent

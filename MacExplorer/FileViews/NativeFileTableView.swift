@@ -7,6 +7,7 @@ struct NativeFileTableView: NSViewRepresentable {
     @Binding var selection: Set<URL>
     var renameURL: URL?
     @Binding var renameText: String
+    var showFilenameExtensions: Bool = true
     var onOpen: (FileItem) -> Void
     var onCommitRename: () -> Void
     var onCancelRename: () -> Void
@@ -286,7 +287,7 @@ struct NativeFileTableView: NSViewRepresentable {
             }()
 
             cell.imageView?.image = FileIconCache.icon(for: item.url, size: 16)
-            cell.textField?.stringValue = item.name
+            cell.textField?.stringValue = item.listedName(showExtension: parent.showFilenameExtensions)
             cell.textField?.isHidden = false
             return cell
         }

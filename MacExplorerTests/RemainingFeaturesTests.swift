@@ -3,6 +3,14 @@ import XCTest
 
 @MainActor
 final class RemainingFeaturesTests: XCTestCase {
+    func testColumnViewModeIsAvailable() {
+        XCTAssertTrue(FileViewMode.allCases.contains(.columns))
+        XCTAssertEqual(FileViewMode.columns.rawValue, "columns")
+        var pane = PaneState(currentURL: URL(fileURLWithPath: "/tmp"))
+        pane.viewMode = .columns
+        XCTAssertEqual(pane.viewMode, .columns)
+    }
+
     func testRecentsRecordAndLimit() {
         let suite = "MacExplorerTests.Recents.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

@@ -56,6 +56,7 @@ struct PaneState: Hashable {
 enum FileViewMode: String, CaseIterable, Identifiable, Sendable {
     case list
     case grid
+    case columns
 
     var id: String { rawValue }
 }

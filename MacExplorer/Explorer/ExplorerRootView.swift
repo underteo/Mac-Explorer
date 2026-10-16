@@ -7,6 +7,10 @@ struct ExplorerRootView: View {
     @EnvironmentObject private var settings: AppSettings
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showTrashConfirm = false
+    @State private var showiCloudTrashConfirm = false
+    @State private var showEmptyTrashConfirm = false
+    @State private var showExtensionChangeConfirm = false
+    @State private var pendingRenameName: String?
     @State private var renameTarget: FileItem?
     @State private var renameText = ""
     @State private var collisionAlert: String?
@@ -19,10 +23,19 @@ struct ExplorerRootView: View {
             })
             .modifier(ExplorerDialogs(
                 showTrashConfirm: $showTrashConfirm,
+                showiCloudTrashConfirm: $showiCloudTrashConfirm,
+                showEmptyTrashConfirm: $showEmptyTrashConfirm,
+                showExtensionChangeConfirm: $showExtensionChangeConfirm,
                 collisionAlert: $collisionAlert,
                 pendingCollision: $pendingCollision,
                 lastErrorMessage: $app.lastErrorMessage,
                 onTrash: { Task { await performTrash() } },
+                onEmptyTrash: { Task { await performEmptyTrash() } },
+                onConfirmExtensionChange: {
+                    if let name = pendingRenameName {
+                        Task { await commitRename(to: name) }
+                    }
+                },
                 onOverwrite: { Task { await resolveCollision(overwrite: true) } }
             ))
             .sheet(item: infoSheetBinding) { item in
@@ -69,6 +82,18 @@ struct ExplorerRootView: View {
         .onChange(of: app.activePaneID) { _, _ in
             if app.selectedTab.hasActiveSearch {
                 Task { await runSearch() }
+            }
+        }
+        .onChange(of: settings.keepFoldersOnTopWhenSortingByName) { _, _ in
+            Task {
+                await refreshPrimary()
+                if app.dualPaneEnabled { await refreshSecondary() }
+            }
+        }
+        .onChange(of: settings.keepFoldersOnTopOnDesktop) { _, _ in
+            Task {
+                await refreshPrimary()
+                if app.dualPaneEnabled { await refreshSecondary() }
             }
         }
         .task {
@@ -138,9 +163,7 @@ struct ExplorerRootView: View {
             showGetInfo()
         case .explorerTrash:
             guard !app.isEditingText else { return }
-            if !app.activePane.selectedURLs.isEmpty {
-                showTrashConfirm = true
-            }
+            requestTrash()
         case .explorerToggleHidden:
             app.showHiddenFiles.toggle()
             Task {
@@ -230,7 +253,8 @@ struct ExplorerRootView: View {
                     pane: primaryPaneBinding,
                     isPrimary: true,
                     onOpen: { item in Task { await openItem(item, primary: true) } },
-                    onTrash: { showTrashConfirm = true },
+                    onFocusDirectory: { url, urls in Task { await focusDirectory(url, primary: true, restoring: urls) } },
+                    onTrash: { requestTrash() },
                     onRename: { beginRename($0) },
                     onRefresh: { Task { await refreshPrimary() } },
                     onCreated: { url in Task { await selectAndBeginRename(url, primary: true) } },
@@ -245,7 +269,8 @@ struct ExplorerRootView: View {
                     pane: secondaryPaneBinding,
                     isPrimary: false,
                     onOpen: { item in Task { await openItem(item, primary: false) } },
-                    onTrash: { showTrashConfirm = true },
+                    onFocusDirectory: { url, urls in Task { await focusDirectory(url, primary: false, restoring: urls) } },
+                    onTrash: { requestTrash() },
                     onRename: { beginRename($0) },
                     onRefresh: { Task { await refreshSecondary() } },
                     onCreated: { url in Task { await selectAndBeginRename(url, primary: false) } },
@@ -262,7 +287,8 @@ struct ExplorerRootView: View {
                 pane: primaryPaneBinding,
                 isPrimary: true,
                 onOpen: { item in Task { await openItem(item, primary: true) } },
-                onTrash: { showTrashConfirm = true },
+                onFocusDirectory: { url, urls in Task { await focusDirectory(url, primary: true, restoring: urls) } },
+                onTrash: { requestTrash() },
                 onRename: { beginRename($0) },
                 onRefresh: { Task { await refreshPrimary() } },
                 onCreated: { url in Task { await selectAndBeginRename(url, primary: true) } },
@@ -352,6 +378,16 @@ struct ExplorerRootView: View {
             .help(L10n.tr("toolbar.refresh"))
             .accessibilityLabel(L10n.tr("toolbar.refresh"))
 
+            if FileItem.isTrashURL(app.activePane.currentURL) {
+                Button {
+                    requestEmptyTrash()
+                } label: {
+                    Label(L10n.tr("action.empty_trash"), systemImage: "trash.slash")
+                }
+                .help(L10n.tr("action.empty_trash"))
+                .accessibilityLabel(L10n.tr("action.empty_trash"))
+            }
+
             Toggle(isOn: $app.showHiddenFiles) {
                 Image(systemName: "eye")
             }
@@ -365,20 +401,25 @@ struct ExplorerRootView: View {
                 }
             }
 
-            Picker(L10n.tr("toolbar.view"), selection: Binding(
-                get: { app.primaryPane.viewMode },
-                set: {
-                    var pane = app.primaryPane
-                    pane.viewMode = $0
-                    app.primaryPane = pane
+            // Dual-pane: each pane has its own view switcher in the pane header.
+            // Toolbar still mirrors the active pane for single-pane / keyboard focus.
+            if !app.dualPaneEnabled {
+                Picker(L10n.tr("toolbar.view"), selection: Binding(
+                    get: { app.primaryPane.viewMode },
+                    set: {
+                        var pane = app.primaryPane
+                        pane.viewMode = $0
+                        app.primaryPane = pane
+                    }
+                )) {
+                    Image(systemName: "square.grid.2x2").tag(FileViewMode.grid)
+                    Image(systemName: "list.bullet").tag(FileViewMode.list)
+                    Image(systemName: "rectangle.split.3x1").tag(FileViewMode.columns)
                 }
-            )) {
-                Image(systemName: "list.bullet").tag(FileViewMode.list)
-                Image(systemName: "square.grid.2x2").tag(FileViewMode.grid)
+                .pickerStyle(.segmented)
+                .help(L10n.tr("toolbar.view"))
+                .accessibilityLabel(L10n.tr("toolbar.view"))
             }
-            .pickerStyle(.segmented)
-            .help(L10n.tr("toolbar.view"))
-            .accessibilityLabel(L10n.tr("toolbar.view"))
 
             Toggle(isOn: $app.dualPaneEnabled) {
                 Image(systemName: "rectangle.split.2x1")
@@ -435,18 +476,49 @@ struct ExplorerRootView: View {
             app.recordRecent(url)
             return
         }
+        await focusDirectory(url, primary: primary, restoring: [])
+    }
+
+    /// Navigate in-pane (column view single-click). Ignores “open folders in tabs”.
+    private func focusDirectory(_ url: URL, primary: Bool, restoring selection: Set<URL>) async {
+        let standardized = url.standardizedFileURL
         if primary {
+            if app.primaryPane.currentURL.standardizedFileURL == standardized {
+                var pane = app.primaryPane
+                pane.selectedURLs = selection.isEmpty ? [standardized] : selection
+                app.primaryPane = pane
+                return
+            }
             await navigatePrimary(to: url)
+            var pane = app.primaryPane
+            pane.selectedURLs = selection.isEmpty ? [standardized] : selection
+            app.primaryPane = pane
         } else {
+            if app.secondaryPane.currentURL.standardizedFileURL == standardized {
+                var pane = app.secondaryPane
+                pane.selectedURLs = selection.isEmpty ? [standardized] : selection
+                app.secondaryPane = pane
+                return
+            }
             var pane = app.secondaryPane
-            await PaneController.navigate(&pane, to: url, using: app.filesystem)
+            await PaneController.navigate(
+                &pane,
+                to: url,
+                using: app.filesystem,
+                keepFoldersOnTop: settings.keepFoldersOnTop(directory: url, sortKey: pane.sortKey)
+            )
+            pane.selectedURLs = selection.isEmpty ? [standardized] : selection
             app.secondaryPane = pane
         }
     }
 
+    private func keepFoldersOnTop(for pane: PaneState) -> Bool {
+        settings.keepFoldersOnTop(directory: pane.currentURL, sortKey: pane.sortKey)
+    }
+
     private func refreshPrimary() async {
         var pane = app.primaryPane
-        await PaneController.reload(&pane, using: app.filesystem)
+        await PaneController.reload(&pane, using: app.filesystem, keepFoldersOnTop: keepFoldersOnTop(for: pane))
         app.primaryPane = pane
         var tab = app.selectedTab
         tab.title = pane.currentURL.lastPathComponent
@@ -455,13 +527,18 @@ struct ExplorerRootView: View {
 
     private func refreshSecondary() async {
         var pane = app.secondaryPane
-        await PaneController.reload(&pane, using: app.filesystem)
+        await PaneController.reload(&pane, using: app.filesystem, keepFoldersOnTop: keepFoldersOnTop(for: pane))
         app.secondaryPane = pane
     }
 
     private func navigatePrimary(to url: URL) async {
         var pane = app.primaryPane
-        await PaneController.navigate(&pane, to: url, using: app.filesystem)
+        await PaneController.navigate(
+            &pane,
+            to: url,
+            using: app.filesystem,
+            keepFoldersOnTop: settings.keepFoldersOnTop(directory: url, sortKey: pane.sortKey)
+        )
         app.primaryPane = pane
         var tab = app.selectedTab
         tab.title = url.lastPathComponent
@@ -473,14 +550,14 @@ struct ExplorerRootView: View {
 
     private func goBackPrimary() async {
         var pane = app.primaryPane
-        await PaneController.goBack(&pane, using: app.filesystem)
+        await PaneController.goBack(&pane, using: app.filesystem, keepFoldersOnTop: keepFoldersOnTop(for: pane))
         app.primaryPane = pane
         app.recordRecent(pane.currentURL)
     }
 
     private func goForwardPrimary() async {
         var pane = app.primaryPane
-        await PaneController.goForward(&pane, using: app.filesystem)
+        await PaneController.goForward(&pane, using: app.filesystem, keepFoldersOnTop: keepFoldersOnTop(for: pane))
         app.primaryPane = pane
         app.recordRecent(pane.currentURL)
     }
@@ -600,7 +677,12 @@ struct ExplorerRootView: View {
     private func navigateActivePane(to url: URL) async {
         if app.dualPaneEnabled, app.activePaneID == .secondary {
             var pane = app.secondaryPane
-            await PaneController.navigate(&pane, to: url, using: app.filesystem)
+            await PaneController.navigate(
+                &pane,
+                to: url,
+                using: app.filesystem,
+                keepFoldersOnTop: settings.keepFoldersOnTop(directory: url, sortKey: pane.sortKey)
+            )
             app.secondaryPane = pane
         } else {
             await navigatePrimary(to: url)
@@ -689,6 +771,19 @@ struct ExplorerRootView: View {
             cancelRename()
             return
         }
+        if settings.warnBeforeChangingExtension,
+           !target.isDirectory,
+           FileItem.pathExtension(of: target.name) != FileItem.pathExtension(of: newName) {
+            pendingRenameName = newName
+            showExtensionChangeConfirm = true
+            return
+        }
+        await commitRename(to: newName)
+    }
+
+    private func commitRename(to newName: String) async {
+        guard let target = renameTarget else { return }
+        pendingRenameName = nil
         do {
             _ = try app.fileOperations.rename(item: target.url, to: newName)
             cancelRename()
@@ -696,7 +791,6 @@ struct ExplorerRootView: View {
             if app.dualPaneEnabled { await refreshSecondary() }
         } catch {
             app.lastErrorMessage = error.localizedDescription
-            // Remount the inline editor so the user can fix the name.
             let item = target
             let draft = newName
             cancelRename()
@@ -706,11 +800,39 @@ struct ExplorerRootView: View {
         }
     }
 
+    private func requestTrash() {
+        guard !app.activePane.selectedURLs.isEmpty else { return }
+        if settings.warnBeforeRemovingFromiCloud,
+           app.activePane.selectedURLs.contains(where: { FileItem.isLikelyiCloudURL($0) }) {
+            showiCloudTrashConfirm = true
+        } else {
+            showTrashConfirm = true
+        }
+    }
+
     private func performTrash() async {
         let urls = Array(app.activePane.selectedURLs)
         guard !urls.isEmpty else { return }
         do {
             try app.fileOperations.moveToTrash(urls)
+            await refreshPrimary()
+            if app.dualPaneEnabled { await refreshSecondary() }
+        } catch {
+            app.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func requestEmptyTrash() {
+        if settings.warnBeforeEmptyingTrash {
+            showEmptyTrashConfirm = true
+        } else {
+            Task { await performEmptyTrash() }
+        }
+    }
+
+    private func performEmptyTrash() async {
+        do {
+            try app.fileOperations.emptyTrash()
             await refreshPrimary()
             if app.dualPaneEnabled { await refreshSecondary() }
         } catch {
@@ -738,9 +860,16 @@ struct ExplorerRootView: View {
         app.selectedTab = tab
 
         do {
-            let results = try app.searchService.search(query: query, in: directory)
+            let results: [FileItem]
+            switch settings.searchScope {
+            case .currentFolder:
+                results = try app.searchService.search(query: query, in: directory)
+            case .thisMac:
+                results = try await Task.detached(priority: .userInitiated) {
+                    try DirectorySearchService().searchThisMac(query: query)
+                }.value
+            }
             tab = app.selectedTab
-            // Drop stale results if the query changed while we were searching.
             guard tab.searchQuery == query else { return }
             tab.searchResults = results
             tab.searchPaneID = paneID
@@ -913,10 +1042,15 @@ private struct ExplorerCommandReceiver: ViewModifier {
 
 private struct ExplorerDialogs: ViewModifier {
     @Binding var showTrashConfirm: Bool
+    @Binding var showiCloudTrashConfirm: Bool
+    @Binding var showEmptyTrashConfirm: Bool
+    @Binding var showExtensionChangeConfirm: Bool
     @Binding var collisionAlert: String?
     @Binding var pendingCollision: PendingCollision?
     @Binding var lastErrorMessage: String?
     let onTrash: () -> Void
+    let onEmptyTrash: () -> Void
+    let onConfirmExtensionChange: () -> Void
     let onOverwrite: () -> Void
 
     func body(content: Content) -> some View {
@@ -926,6 +1060,24 @@ private struct ExplorerDialogs: ViewModifier {
                 Button(L10n.tr("alert.trash.confirm"), role: .destructive, action: onTrash)
             } message: {
                 Text(L10n.tr("alert.trash.message"))
+            }
+            .alert(L10n.tr("alert.icloud_trash.title"), isPresented: $showiCloudTrashConfirm) {
+                Button(L10n.tr("alert.cancel"), role: .cancel) {}
+                Button(L10n.tr("alert.trash.confirm"), role: .destructive, action: onTrash)
+            } message: {
+                Text(L10n.tr("alert.icloud_trash.message"))
+            }
+            .alert(L10n.tr("alert.empty_trash.title"), isPresented: $showEmptyTrashConfirm) {
+                Button(L10n.tr("alert.cancel"), role: .cancel) {}
+                Button(L10n.tr("alert.empty_trash.confirm"), role: .destructive, action: onEmptyTrash)
+            } message: {
+                Text(L10n.tr("alert.empty_trash.message"))
+            }
+            .alert(L10n.tr("alert.extension.title"), isPresented: $showExtensionChangeConfirm) {
+                Button(L10n.tr("alert.cancel"), role: .cancel) {}
+                Button(L10n.tr("alert.extension.confirm"), role: .destructive, action: onConfirmExtensionChange)
+            } message: {
+                Text(L10n.tr("alert.extension.message"))
             }
             .alert(L10n.tr("alert.error.title"), isPresented: Binding(
                 get: { lastErrorMessage != nil },

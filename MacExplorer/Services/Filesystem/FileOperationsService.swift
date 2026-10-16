@@ -71,6 +71,19 @@ struct FileOperationsService: @unchecked Sendable {
         }
     }
 
+    func emptyTrash() throws {
+        let trash = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".Trash", isDirectory: true)
+        let contents = try fileManager.contentsOfDirectory(
+            at: trash,
+            includingPropertiesForKeys: nil,
+            options: []
+        )
+        for item in contents {
+            try fileManager.removeItem(at: item)
+        }
+    }
+
     func copyWithProgress(
         items: [URL],
         to directory: URL,

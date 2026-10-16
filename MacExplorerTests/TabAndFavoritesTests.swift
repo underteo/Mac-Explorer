@@ -48,6 +48,38 @@ final class TabAndFavoritesTests: XCTestCase {
         XCTAssertEqual(results.map(\.name), ["alpha.txt"])
     }
 
+    func testAdvancedSettingsDefaultsAndFoldersOnTop() {
+        let suiteName = "MacExplorerTests.Advanced.\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: suiteName)!
+        defer { suite.removePersistentDomain(forName: suiteName) }
+        let settings = AppSettings(defaults: suite)
+        XCTAssertTrue(settings.showAllFilenameExtensions)
+        XCTAssertTrue(settings.warnBeforeChangingExtension)
+        XCTAssertEqual(settings.searchScope, .currentFolder)
+
+        let docs = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents", isDirectory: true)
+        settings.keepFoldersOnTopWhenSortingByName = false
+        XCTAssertFalse(settings.keepFoldersOnTop(directory: docs, sortKey: .name))
+        settings.keepFoldersOnTopWhenSortingByName = true
+        XCTAssertTrue(settings.keepFoldersOnTop(directory: docs, sortKey: .name))
+        XCTAssertFalse(settings.keepFoldersOnTop(directory: docs, sortKey: .size))
+
+        let file = FileItem(
+            url: URL(fileURLWithPath: "/tmp/photo.jpg"),
+            name: "photo.jpg",
+            isDirectory: false,
+            isHidden: false,
+            isSymbolicLink: false,
+            fileSize: 1,
+            contentModificationDate: nil,
+            creationDate: nil,
+            contentType: nil
+        )
+        XCTAssertEqual(file.listedName(showExtension: true), "photo.jpg")
+        XCTAssertEqual(file.listedName(showExtension: false), "photo")
+    }
+
     func testShortcutDoesNotStealTextFieldWhenEditing() {
         let app = AppModel()
         app.isEditingText = true

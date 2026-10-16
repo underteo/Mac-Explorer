@@ -5,6 +5,9 @@ struct PaneBrowserView: View {
     @Binding var pane: PaneState
     let isPrimary: Bool
     let onOpen: (FileItem) -> Void
+    /// Focus a directory in this pane without the “open folders in tabs” preference (column view).
+    /// Second argument is the selection to restore after navigation (folder or file URLs).
+    var onFocusDirectory: ((URL, Set<URL>) -> Void)? = nil
     let onTrash: () -> Void
     let onRename: (FileItem) -> Void
     let onRefresh: () -> Void
@@ -37,12 +40,19 @@ struct PaneBrowserView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 8) {
                 Text(pane.currentURL.lastPathComponent)
                     .font(.headline)
                     .lineLimit(1)
-                Spacer()
+                    .layoutPriority(1)
+                Spacer(minLength: 4)
+
+                if app.dualPaneEnabled {
+                    viewModePicker
+                }
+
                 Button {
+                    onActivate()
                     if app.isFavorite(pane.currentURL) {
                         app.removeFavorite(url: pane.currentURL)
                     } else {
@@ -55,17 +65,12 @@ struct PaneBrowserView: View {
                 .help(app.isFavorite(pane.currentURL) ? L10n.tr("favorites.remove") : L10n.tr("favorites.add"))
                 .accessibilityLabel(app.isFavorite(pane.currentURL) ? L10n.tr("favorites.remove") : L10n.tr("favorites.add"))
 
-                if !isPrimary {
-                    Text(L10n.tr("pane.secondary"))
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.quaternary, in: Capsule())
-                }
                 sortMenu
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .onTapGesture { onActivate() }
 
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -74,14 +79,32 @@ struct PaneBrowserView: View {
         .onChange(of: pane.selectedURLs) { _, _ in
             onActivate()
         }
+        .onChange(of: pane.viewMode) { _, _ in
+            onActivate()
+        }
+    }
+
+    private var viewModePicker: some View {
+        Picker(L10n.tr("toolbar.view"), selection: $pane.viewMode) {
+            Image(systemName: "square.grid.2x2").tag(FileViewMode.grid)
+            Image(systemName: "list.bullet").tag(FileViewMode.list)
+            Image(systemName: "rectangle.split.3x1").tag(FileViewMode.columns)
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .frame(maxWidth: 118)
+        .help(L10n.tr("toolbar.view"))
+        .accessibilityLabel(L10n.tr("toolbar.view"))
     }
 
     @ViewBuilder
     private var content: some View {
-        if pane.isLoading {
+        // Column view keeps its own chain; avoid unmounting it on every in-pane focus load.
+        if pane.isLoading, pane.viewMode != .columns {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let error = pane.errorMessage {
+        } else if let error = pane.errorMessage, pane.viewMode != .columns || pane.items.isEmpty {
             ExplorerEmptyState(
                 title: L10n.tr("state.error.title"),
                 systemImage: "exclamationmark.triangle",
@@ -104,6 +127,29 @@ struct PaneBrowserView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
             .contextMenu { backgroundMenu }
+        } else if pane.viewMode == .columns {
+            FileColumnView(
+                directoryURL: pane.currentURL,
+                items: displayedItems,
+                isFlat: showsSearchResults,
+                sortKey: pane.sortKey,
+                sortAscending: pane.sortAscending,
+                selection: $pane.selectedURLs,
+                onOpen: onOpen,
+                onFocusDirectory: { url, urls in
+                    if let onFocusDirectory {
+                        onFocusDirectory(url, urls)
+                    } else {
+                        onOpen(FileItem.representingDirectory(url))
+                    }
+                },
+                renameURL: renameURL,
+                renameText: $renameText,
+                onCommitRename: onCommitRename,
+                onCancelRename: onCancelRename,
+                itemMenu: { item in selectionMenu(urls: [item.url]) },
+                backgroundMenu: { backgroundMenu }
+            )
         } else if pane.viewMode == .grid {
             FileGridView(
                 items: displayedItems,

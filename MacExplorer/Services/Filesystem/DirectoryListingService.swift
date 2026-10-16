@@ -13,7 +13,8 @@ struct DirectoryListingService: @unchecked Sendable {
     func listContents(
         of url: URL,
         sortKey: FileSortKey = .name,
-        ascending: Bool = true
+        ascending: Bool = true,
+        keepFoldersOnTop: Bool = true
     ) throws -> [FileItem] {
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
@@ -41,7 +42,7 @@ struct DirectoryListingService: @unchecked Sendable {
                 options: includeHiddenFiles ? [] : [.skipsHiddenFiles]
             )
             let items = try urls.map { try makeItem(from: $0) }
-            return sort(items, by: sortKey, ascending: ascending)
+            return sort(items, by: sortKey, ascending: ascending, keepFoldersOnTop: keepFoldersOnTop)
         } catch let error as NSError {
             if error.domain == NSPOSIXErrorDomain && (error.code == EACCES || error.code == EPERM) {
                 throw FilesystemError.permissionDenied(url.lastPathComponent)
@@ -77,9 +78,14 @@ struct DirectoryListingService: @unchecked Sendable {
         )
     }
 
-    func sort(_ items: [FileItem], by key: FileSortKey, ascending: Bool) -> [FileItem] {
+    func sort(
+        _ items: [FileItem],
+        by key: FileSortKey,
+        ascending: Bool,
+        keepFoldersOnTop: Bool = true
+    ) -> [FileItem] {
         let sorted = items.sorted { lhs, rhs in
-            if lhs.isDirectory != rhs.isDirectory {
+            if keepFoldersOnTop, lhs.isDirectory != rhs.isDirectory {
                 return lhs.isDirectory && !rhs.isDirectory
             }
             let result: ComparisonResult

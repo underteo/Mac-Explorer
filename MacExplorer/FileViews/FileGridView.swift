@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 
 struct FileGridView<ItemMenu: View, BackgroundMenu: View>: View {
+    @EnvironmentObject private var settings: AppSettings
     let items: [FileItem]
     @Binding var selection: Set<URL>
     let onOpen: (FileItem) -> Void
@@ -29,6 +30,7 @@ struct FileGridView<ItemMenu: View, BackgroundMenu: View>: View {
                                 item: item,
                                 isSelected: selection.contains(item.url),
                                 isRenaming: renameURL == item.url,
+                                showFilenameExtensions: settings.showAllFilenameExtensions,
                                 renameText: $renameText,
                                 onCommitRename: onCommitRename,
                                 onCancelRename: onCancelRename,
@@ -68,11 +70,16 @@ private struct FileGridCell: View {
     let item: FileItem
     let isSelected: Bool
     let isRenaming: Bool
+    var showFilenameExtensions: Bool = true
     @Binding var renameText: String
     var onCommitRename: () -> Void
     var onCancelRename: () -> Void
     var onOpen: () -> Void
     var onSelect: (_ exclusive: Bool) -> Void
+
+    private var listedName: String {
+        item.listedName(showExtension: showFilenameExtensions)
+    }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -90,7 +97,7 @@ private struct FileGridCell: View {
                 )
                 .frame(maxWidth: 140, minHeight: 22)
             } else {
-                Text(item.name)
+                Text(listedName)
                     .font(.caption)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
@@ -109,6 +116,6 @@ private struct FileGridCell: View {
             guard !isRenaming else { return }
             onSelect(!NSEvent.modifierFlags.contains(.command))
         }
-        .accessibilityLabel(item.name)
+        .accessibilityLabel(listedName)
     }
 }

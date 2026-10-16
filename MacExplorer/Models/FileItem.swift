@@ -47,6 +47,33 @@ struct FileItem: Identifiable, Hashable, Sendable {
         }
     }
 
+    /// Finder-like display name (optionally hide the extension for files).
+    func listedName(showExtension: Bool) -> String {
+        if isDirectory || showExtension { return name }
+        let ns = name as NSString
+        let ext = ns.pathExtension
+        guard !ext.isEmpty, ns.length > ext.count + 1 else { return name }
+        return ns.deletingPathExtension
+    }
+
+    static func pathExtension(of fileName: String) -> String {
+        (fileName as NSString).pathExtension.lowercased()
+    }
+
+    static func isLikelyiCloudURL(_ url: URL) -> Bool {
+        let path = url.path
+        return path.contains("/Library/Mobile Documents/")
+            || path.contains("com~apple~CloudDocs")
+    }
+
+    static func isTrashURL(_ url: URL) -> Bool {
+        let trash = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".Trash", isDirectory: true)
+            .standardizedFileURL
+        return url.standardizedFileURL == trash
+            || url.standardizedFileURL.path.hasPrefix(trash.path + "/")
+    }
+
     /// Lightweight folder item for context menus (e.g. empty-area plugins → current directory).
     static func representingDirectory(_ url: URL) -> FileItem {
         let standardized = url.standardizedFileURL

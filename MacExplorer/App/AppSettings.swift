@@ -72,6 +72,28 @@ final class AppSettings: ObservableObject {
         static let openInTabs = "settings.openFoldersInTabs"
         static let sidebarVisible = "settings.sidebarVisibleItems"
         static let sidebarOrder = "settings.sidebarOrder"
+        static let showAllExtensions = "settings.showAllFilenameExtensions"
+        static let warnExtension = "settings.warnBeforeChangingExtension"
+        static let warniCloud = "settings.warnBeforeRemovingFromiCloud"
+        static let warnEmptyTrash = "settings.warnBeforeEmptyingTrash"
+        static let removeTrash30 = "settings.removeTrashAfter30Days"
+        static let foldersOnTopName = "settings.keepFoldersOnTopWhenSortingByName"
+        static let foldersOnTopDesktop = "settings.keepFoldersOnTopOnDesktop"
+        static let searchScope = "settings.searchScope"
+    }
+
+    enum SearchScope: String, CaseIterable, Identifiable {
+        case currentFolder
+        case thisMac
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .currentFolder: return L10n.tr("settings.advanced.search.current_folder")
+            case .thisMac: return L10n.tr("settings.advanced.search.this_mac")
+            }
+        }
     }
 
     /// Default sidebar visibility (Finder-like: media folders off, core locations on).
@@ -140,6 +162,42 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    @Published var showAllFilenameExtensions: Bool {
+        didSet { defaults.set(showAllFilenameExtensions, forKey: Keys.showAllExtensions) }
+    }
+
+    @Published var warnBeforeChangingExtension: Bool {
+        didSet { defaults.set(warnBeforeChangingExtension, forKey: Keys.warnExtension) }
+    }
+
+    @Published var warnBeforeRemovingFromiCloud: Bool {
+        didSet { defaults.set(warnBeforeRemovingFromiCloud, forKey: Keys.warniCloud) }
+    }
+
+    @Published var warnBeforeEmptyingTrash: Bool {
+        didSet { defaults.set(warnBeforeEmptyingTrash, forKey: Keys.warnEmptyTrash) }
+    }
+
+    /// Mirrors Finder’s “Remove items from the Trash after 30 days” when possible.
+    @Published var removeTrashAfter30Days: Bool {
+        didSet {
+            defaults.set(removeTrashAfter30Days, forKey: Keys.removeTrash30)
+            UserDefaults(suiteName: "com.apple.finder")?.set(removeTrashAfter30Days, forKey: "FXRemoveOldTrashItems")
+        }
+    }
+
+    @Published var keepFoldersOnTopWhenSortingByName: Bool {
+        didSet { defaults.set(keepFoldersOnTopWhenSortingByName, forKey: Keys.foldersOnTopName) }
+    }
+
+    @Published var keepFoldersOnTopOnDesktop: Bool {
+        didSet { defaults.set(keepFoldersOnTopOnDesktop, forKey: Keys.foldersOnTopDesktop) }
+    }
+
+    @Published var searchScope: SearchScope {
+        didSet { defaults.set(searchScope.rawValue, forKey: Keys.searchScope) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -169,6 +227,38 @@ final class AppSettings: ObservableObject {
         } else {
             self.sidebarOrder = Self.defaultSidebarOrder
         }
+
+        self.showAllFilenameExtensions = defaults.object(forKey: Keys.showAllExtensions) as? Bool ?? true
+        self.warnBeforeChangingExtension = defaults.object(forKey: Keys.warnExtension) as? Bool ?? true
+        self.warnBeforeRemovingFromiCloud = defaults.object(forKey: Keys.warniCloud) as? Bool ?? true
+        self.warnBeforeEmptyingTrash = defaults.object(forKey: Keys.warnEmptyTrash) as? Bool ?? true
+
+        if let saved = defaults.object(forKey: Keys.removeTrash30) as? Bool {
+            self.removeTrashAfter30Days = saved
+        } else if let finder = UserDefaults(suiteName: "com.apple.finder")?.object(forKey: "FXRemoveOldTrashItems") as? Bool {
+            self.removeTrashAfter30Days = finder
+        } else {
+            self.removeTrashAfter30Days = false
+        }
+
+        self.keepFoldersOnTopWhenSortingByName = defaults.object(forKey: Keys.foldersOnTopName) as? Bool ?? true
+        self.keepFoldersOnTopOnDesktop = defaults.object(forKey: Keys.foldersOnTopDesktop) as? Bool ?? false
+
+        let scopeRaw = defaults.string(forKey: Keys.searchScope) ?? SearchScope.currentFolder.rawValue
+        self.searchScope = SearchScope(rawValue: scopeRaw) ?? .currentFolder
+    }
+
+    func keepFoldersOnTop(directory: URL, sortKey: FileSortKey) -> Bool {
+        let desktop = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Desktop", isDirectory: true)
+            .standardizedFileURL
+        if keepFoldersOnTopOnDesktop, directory.standardizedFileURL == desktop {
+            return true
+        }
+        if sortKey == .name, keepFoldersOnTopWhenSortingByName {
+            return true
+        }
+        return false
     }
 
     /// All destinations in user order, appending any newly added ones at the end.

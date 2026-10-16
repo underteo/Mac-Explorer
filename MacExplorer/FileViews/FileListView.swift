@@ -4,6 +4,7 @@ import AppKit
 /// Row-based file list. Uses a native `NSTableView` so selection highlight matches Finder timing.
 struct FileListView: View {
     @EnvironmentObject private var app: AppModel
+    @EnvironmentObject private var settings: AppSettings
     let items: [FileItem]
     @Binding var selection: Set<URL>
     let directoryURL: URL
@@ -24,6 +25,7 @@ struct FileListView: View {
             selection: $selection,
             renameURL: renameURL,
             renameText: $renameText,
+            showFilenameExtensions: settings.showAllFilenameExtensions,
             onOpen: onOpen,
             onCommitRename: onCommitRename,
             onCancelRename: onCancelRename,
