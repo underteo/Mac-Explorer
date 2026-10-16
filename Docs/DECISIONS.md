@@ -13,7 +13,8 @@
 | Open folders | Prefer tabs (Settings); optional navigate in place |
 | Interface zoom | 50%–150% (default 100%), Settings → General |
 | Extensibility | Open With (Launch Services) first; then out-of-process plugins with Settings toggle |
-| Plugin location | `~/Library/Application Support/Mac Explorer/Plugins/` |
+| Plugin location | `~/Library/Application Support/Mac Explorer/Plugins/` (empty on fresh install; examples only in `Examples/` for optional install) |
+| Distribution | GitHub public **source-available** + proprietary `LICENSE` (no unauthorized redistribution). Packaged `.app` via `scripts/package_app.sh` does not ship plugins. |
 | Dependencies | No external SPM packages |
 
 ## Toolchain note

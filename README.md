@@ -49,34 +49,28 @@ Run in Xcode with **⌘R**.
 - Menu bar commands and keyboard shortcuts
 - Plugins (out of process) with Settings → Plugins enable/disable
 
-## Plugins
+## Install (end users)
 
-1. Copy a plugin folder from `Examples/` to  
-   `~/Library/Application Support/Mac Explorer/Plugins/`
-2. `chmod +x …/run.sh`
-3. Reload in **Settings → Plugins**
+```bash
+./scripts/package_app.sh
+# → dist/Mac Explorer.app  and  dist/MacExplorer-macOS.zip
+```
 
-Included examples:
+Copy `Mac Explorer.app` to `/Applications`. **No plugins are bundled.** On first launch the app creates an empty:
 
-- **SamplePlugin** — logs selection (demo)
-- **Cursor** — open chat/agent, open in Cursor, diff, copy CLI (`cursor` must be on `PATH`)
+`~/Library/Application Support/Mac Explorer/Plugins/`
 
-Authoring guide: [Docs/CreatingPlugins.md](Docs/CreatingPlugins.md)
+## Plugins (optional)
 
-API: [Docs/PluginAPI.md](Docs/PluginAPI.md)
+Examples under `Examples/` are **source-only** (for developers). They are not installed with the app.
+
+To add one later: **Plugins → Install Plugin…** and pick e.g. `Examples/Cursor`, or use Settings → Plugins.
+
+Authoring guide: [Docs/CreatingPlugins.md](Docs/CreatingPlugins.md) · API: [Docs/PluginAPI.md](Docs/PluginAPI.md)
 
 ## Signing / notarization
 
-Development builds use Automatic signing. **Not notarized** unless you complete Developer ID + notarization yourself. This README will not claim distribution readiness without those steps.
-
-### Archive
-
-In Xcode: Product → Archive. Or:
-
-```bash
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-xcodebuild -scheme MacExplorer -configuration Release archive -archivePath "/tmp/MacExplorer.xcarchive"
-```
+Packaged builds use ad-hoc signing (`CODE_SIGN_IDENTITY=-`) unless you configure Developer ID + notarization yourself.
 
 ## Docs
 
