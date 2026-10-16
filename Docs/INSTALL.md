@@ -32,7 +32,7 @@ Then either:
 Local daily use on *your* machine stays:
 
 ```bash
-./scripts/install_to_applications.sh   # signed Apple Development → /Applications
+./scripts/install_to_applications.sh   # ad-hoc → /Applications (same as package)
 ```
 
 ## Someone else (end user): install from a zip / Release
@@ -60,5 +60,5 @@ cd Mac-Explorer
 
 ## Notes
 
-- Packaged builds are **ad-hoc signed** until you add Developer ID + notarization.
+- Local install and packaged builds are both **ad-hoc** (`Signature=adhoc`). CI refuses Apple Development / Developer ID on the release zip. Keep using `/Applications/Mac Explorer.app` so path + bundle ID stay stable across rebuilds.
 - Plugins are **not** inside the `.app`; the app creates an empty Plugins folder on first launch.

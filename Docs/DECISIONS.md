@@ -7,7 +7,7 @@
 | Deployment target | macOS 26.0 (Tahoe); SDK 27 via Xcode 27.1 |
 | Distribution | Outside App Store |
 | App Sandbox | **OFF** |
-| Folder TCC | No in-app FDA prompts — macOS may ask once natively. Prefer a stably signed `/Applications/Mac Explorer.app` (`scripts/install_to_applications.sh`) so grants stick across rebuilds. |
+| Folder TCC | No in-app FDA prompts — macOS may ask once natively. Prefer `/Applications/Mac Explorer.app` via `scripts/install_to_applications.sh` (ad-hoc, fixed path + bundle ID) so grants stick across rebuilds. |
 | UI language | Default: system (en+it tables). Overridable in Settings → General |
 | New window location | Configurable (Recents/Home/…); default Recents |
 | Open folders | Prefer tabs (Settings) for some flows; **double-click / column focus always navigates in-pane** (ignores “open in tabs”). |
@@ -21,8 +21,8 @@
 | Tags | System Finder tags via `URLResourceValues.tagNames`. Colors = semantic `NSColor.system*` (not pastel `fileLabelColors`). Dots + icon wash shared via `FileIconCache` / `FinderTagDots*`. |
 | Context vs Actions menu | Configurable per action: **Context** / **Actions** (menu bar Azioni) / **Both** / **Hidden**. Defaults keep the right-click menu lean; extras (compress, alias, Quick Look, Terminal, open in pane, …) start in Azioni. Right-click always includes **Settings…** deep-link to Settings → Menu. Do not clone Finder’s full Services/Continuity menu. |
 | Dual-pane transfer | Source = active pane selection; destination = other pane. Toolbar buttons always visible; disabled when single-pane or empty selection. |
-| Install script | `scripts/install_to_applications.sh` always builds Release, installs to `/Applications`, then removes other DerivedData/dist `.app` copies so TCC stays on the Applications bundle. |
-| Share / package | `scripts/package_app.sh` → ad-hoc `.app` + zip under `dist/` (gitignored). Publish via GitHub Releases (`v*` tags / Actions `Package` workflow). See `Docs/INSTALL.md`. |
+| Install script | `scripts/install_to_applications.sh` builds Release, ad-hoc signs, installs to `/Applications`, then removes other DerivedData/dist `.app` copies so only that path is launched. |
+| Share / package | `scripts/package_app.sh` → same ad-hoc `.app` + zip under `dist/` (gitignored). Publish via GitHub Releases (`v*` tags / Actions `Package` on `macos-26`). See `Docs/INSTALL.md`. |
 | Extensibility | Open With (Launch Services) first; then out-of-process plugins with Settings toggle |
 | Plugin location | `~/Library/Application Support/Mac Explorer/Plugins/` (empty on fresh install; examples only in `Examples/` for optional install) |
 | Distribution | GitHub public **source-available** + proprietary `LICENSE` (no unauthorized redistribution). Packaged `.app` via `scripts/package_app.sh` does not ship plugins. |

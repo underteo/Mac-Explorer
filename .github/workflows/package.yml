@@ -1,5 +1,6 @@
 # Build MacExplorer-macOS.zip and attach it to a GitHub Release.
 # Trigger: push a tag like v0.1.0, or run manually from the Actions tab.
+# Signing: always ad-hoc (same as scripts/package_app.sh) — verified before upload.
 name: Package
 
 on:
@@ -18,22 +19,35 @@ permissions:
 
 jobs:
   package:
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
         run: |
-          # Prefer a full Xcode app on the runner; fall back to default.
           if [ -d /Applications/Xcode.app ]; then
             echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
             sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           fi
           xcodebuild -version
+          sw_vers
 
       - name: Package app
         run: ./scripts/package_app.sh
+
+      - name: Verify ad-hoc signature
+        run: |
+          set -eu
+          APP="dist/Mac Explorer.app"
+          codesign -dv --verbose=4 "$APP" 2>&1 | tee /tmp/codesign.txt
+          grep -q 'Signature=adhoc' /tmp/codesign.txt
+          # Refuse Apple Development / Developer ID leaking into the release zip.
+          if grep -E 'Authority=(Apple Development|Developer ID Application)' /tmp/codesign.txt; then
+            echo "Unexpected certificate authority in packaged app" >&2
+            exit 1
+          fi
+          echo "Release signature OK (ad-hoc)"
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
@@ -52,7 +66,7 @@ jobs:
           ZIP="dist/MacExplorer-macOS.zip"
           NOTES="$(mktemp)"
           cat > "$NOTES" <<EOF
-          Mac Explorer for macOS (ad-hoc signed).
+          Mac Explorer for macOS (ad-hoc signed — same identity every build).
 
           Install:
           1. Unzip \`MacExplorer-macOS.zip\`

@@ -1,15 +1,15 @@
 #!/bin/sh
-# Build Release, sign with Apple Development (stable TCC identity), install to /Applications.
+# Build Release, ad-hoc sign (same as package_app.sh), install to /Applications.
 # Always runs xcodebuild (incremental). CLEAN=1 for a full clean rebuild.
-# After install, removes other MacExplorer.app products (DerivedData / dist) so TCC
-# and “Open” always hit /Applications — not an Xcode build path.
+# After install, removes other MacExplorer.app products (DerivedData / dist) so
+# “Open” always hits /Applications — not an Xcode build path.
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
-TEAM="${DEVELOPMENT_TEAM:-H567X35N93}"
-IDENTITY="${CODE_SIGN_IDENTITY:-Apple Development: matteo.cazzoli@gmail.com (DNZA73X6PP)}"
+SIGN_IDENTITY="-"
+ENTITLEMENTS="$ROOT/MacExplorer/MacExplorer.entitlements"
 DEST="/Applications/Mac Explorer.app"
 ARCH="$(uname -m)"
 CLEAN="${CLEAN:-0}"
@@ -81,8 +81,11 @@ xcodebuild \
   -destination "platform=macOS,arch=${ARCH}" \
   -quiet \
   $XCODE_ACTION \
-  DEVELOPMENT_TEAM="$TEAM" \
-  CODE_SIGN_STYLE=Automatic \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
+  CODE_SIGNING_ALLOWED=YES \
+  CODE_SIGNING_REQUIRED=YES \
+  DEVELOPMENT_TEAM= \
   >"$LOG" 2>&1
 STATUS=$?
 set -e
@@ -105,11 +108,24 @@ fi
 
 rm -rf "$DEST"
 cp -R "$APP" "$DEST"
-codesign --force --deep --options runtime --sign "$IDENTITY" "$DEST"
+codesign --force --deep --options runtime \
+  --sign "$SIGN_IDENTITY" \
+  --entitlements "$ENTITLEMENTS" \
+  "$DEST"
+
+VERIFY="$(codesign -dv --verbose=4 "$DEST" 2>&1 || true)"
+case "$VERIFY" in
+  *Signature=adhoc*) ;;
+  *)
+    echo "Expected ad-hoc signature on $DEST" >&2
+    echo "$VERIFY" >&2
+    exit 1
+    ;;
+esac
 
 # Delete DerivedData/dist app bundles *after* copy so only /Applications remains.
 remove_non_install_apps
 
 STAMP="$(stat -f '%Sm' -t '%H:%M:%S' "$DEST/Contents/MacOS/MacExplorer")"
 SIZE="$(stat -f '%z' "$DEST/Contents/MacOS/MacExplorer")"
-echo "Installed: $DEST ($STAMP, ${SIZE} bytes)"
+echo "Installed: $DEST ($STAMP, ${SIZE} bytes, ad-hoc)"

@@ -32,7 +32,7 @@ Or from the terminal (scripts set `DEVELOPER_DIR` to Xcode.app so CLT is not use
 ```bash
 ./scripts/build.sh
 ./scripts/test.sh
-./scripts/install_to_applications.sh   # Release → /Applications, stable signing
+./scripts/install_to_applications.sh   # Release → /Applications, ad-hoc (same as package)
 ```
 
 Run in Xcode with **⌘R**.
@@ -93,7 +93,7 @@ Authoring guide: [Docs/CreatingPlugins.md](Docs/CreatingPlugins.md) · API: [Doc
 
 ## Signing / notarization
 
-Packaged builds use ad-hoc signing (`CODE_SIGN_IDENTITY=-`) unless you configure Developer ID + notarization yourself.
+Local install and packaged builds both use ad-hoc signing (`CODE_SIGN_IDENTITY=-`) unless you configure Developer ID + notarization yourself.
 
 ## Docs
 
@@ -115,5 +115,5 @@ You may download and read the source for personal evaluation. **Unauthorized red
 | `xcodebuild` wants CLT | Set `DEVELOPER_DIR` or `xcode-select` to Xcode.app |
 | Plugin missing | Check Application Support path and `manifest.json` |
 | Permission errors | Expected for protected folders; app reports them without crashing |
-| FDA / Library / Desktop prompts every reinstall | Ad-hoc Debug builds get a **new** code signature each time → macOS treats them as a new app. Install with `./scripts/install_to_applications.sh` (Apple Development + Team ID). Grant Full Disk Access once to `/Applications/Mac Explorer.app`, remove duplicate entries, never launch the DerivedData copy. |
+| FDA / Library / Desktop prompts every reinstall | Launching DerivedData/Debug copies confuses TCC. Always install with `./scripts/install_to_applications.sh` and open only `/Applications/Mac Explorer.app` (same path + bundle ID + ad-hoc). Grant once there; remove duplicate Privacy entries. |
 | Context menu too crowded / missing items | Settings → Menu (or right-click → Settings…) |
